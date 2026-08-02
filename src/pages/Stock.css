@@ -1,0 +1,254 @@
+.stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.stock-card {
+  display: flex;
+  flex-direction: row;
+  height: 200px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.stock-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+/* --- Columna imagen (lado izquierdo) ---
+   Ancho dinámico via inline style → sin recorte. */
+.stock-image-col {
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+}
+
+.stock-image-col img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.stock-card:hover .stock-image-col img {
+  transform: scale(1.04);
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.badge-stock-area {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(26, 54, 68, 0.82);
+  color: #fff;
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.quantity-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--color-accent-green);
+  color: #fff;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-xl);
+  font-size: 0.72rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Columna contenido (lado derecho) --- */
+.stock-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Sección 1 — Nombre (anclado arriba, flex-shrink 0) */
+.stock-section-name {
+  padding: 0.45rem 0.8rem 0.4rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.stock-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+/* Sección 2 — Info: material, tela, precio, descripción */
+.stock-section-info {
+  padding: 0.35rem 0.8rem;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+.stock-info-line {
+  font-size: 0.76rem;
+  color: var(--color-text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.stock-info-line strong {
+  font-weight: 600;
+  color: var(--color-text-dark);
+}
+
+.stock-info-price {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--color-accent-green);
+  margin-top: 0.1rem;
+  line-height: 1.2;
+}
+
+.stock-info-desc {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.stock-price-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.price-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.stock-price {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-accent-green);
+}
+
+/* Sección 3 — Controles de cantidad */
+.stock-section-qty {
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.btn-qty {
+  color: var(--color-text-light);
+  display: flex;
+  align-items: center;
+  transition: color var(--transition-fast);
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-qty:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.btn-qty:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.qty-val {
+  font-weight: 700;
+  font-size: 0.95rem;
+  min-width: 1.5ch;
+  text-align: center;
+}
+
+/* Sección 4 — Botón principal (Vender) */
+.stock-section-main {
+  padding: 0;
+  flex-shrink: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.btn-card-primary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: transparent;
+  color: var(--color-primary);
+  border: none;
+  padding: 0.6rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.82rem;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  cursor: pointer;
+}
+
+.btn-card-primary:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-card-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stock-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-light);
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  padding: 3rem;
+  text-align: center;
+  color: var(--color-text-light);
+}

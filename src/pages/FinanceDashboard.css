@@ -1,0 +1,292 @@
+/* FinanceDashboard.css — Diseño premium para métricas */
+
+/* ── Header de controles ── */
+.fin-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.fin-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.fin-title-icon {
+  color: var(--color-primary);
+}
+
+.fin-period-chips {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.fin-chip {
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--radius-xl);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-dark);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fin-chip:hover {
+  background: var(--color-surface-3);
+}
+
+.fin-chip.active {
+  background: var(--color-primary);
+  color: #fff !important;
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.fin-custom-dates {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fin-custom-dates input[type="date"] {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dark);
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.fin-date-sep {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.fin-refresh {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-dark);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.fin-refresh:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+[data-theme="dark"] .fin-chip {
+  background: #21262D;
+  border-color: #484F58;
+  color: #C9D1D9;
+}
+
+[data-theme="dark"] .fin-chip:hover {
+  background: #30363D;
+  color: #F0F6FC;
+}
+
+[data-theme="dark"] .fin-chip.active {
+  background: #1F6FEB;
+  border-color: #58A6FF;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 10px rgba(88, 166, 255, 0.3);
+}
+
+[data-theme="dark"] .fin-refresh {
+  background: #21262D;
+  border-color: #484F58;
+  color: #C9D1D9;
+}
+
+[data-theme="dark"] .fin-refresh:hover {
+  background: #1F6FEB;
+  border-color: #58A6FF;
+  color: #FFFFFF;
+}
+
+/* ── KPI Cards Grid ── */
+.fin-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+}
+
+.fin-kpi-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 1.25rem 1.4rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.fin-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Acento de color superior */
+.fin-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.fin-kpi-card.green::before  { background: #10b981; }
+.fin-kpi-card.red::before    { background: #ef4444; }
+.fin-kpi-card.amber::before  { background: #f59e0b; }
+.fin-kpi-card.blue::before   { background: #3b82f6; }
+
+/* Icono flotante en esquina */
+.fin-kpi-icon {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.15;
+}
+
+.fin-kpi-card.green .fin-kpi-icon { background: #10b981; color: #10b981; opacity: 1; color: #fff; opacity: 0.2; }
+.fin-kpi-card.red   .fin-kpi-icon { background: #ef4444; color: #fff; opacity: 0.2; }
+.fin-kpi-card.amber .fin-kpi-icon { background: #f59e0b; color: #fff; opacity: 0.2; }
+.fin-kpi-card.blue  .fin-kpi-icon { background: #3b82f6; color: #fff; opacity: 0.2; }
+
+.fin-kpi-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fin-kpi-value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.fin-kpi-card.green  .fin-kpi-value { color: #10b981; }
+.fin-kpi-card.red    .fin-kpi-value { color: #ef4444; }
+.fin-kpi-card.amber  .fin-kpi-value { color: #f59e0b; }
+.fin-kpi-card.blue   .fin-kpi-value { color: #3b82f6; }
+
+.fin-kpi-sub {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: -0.2rem;
+}
+
+/* ── Charts Grid ── */
+.fin-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+}
+
+@media (max-width: 768px) {
+  .fin-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fin-chart-card {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.fin-chart-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+
+.fin-chart-header h4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  margin: 0;
+}
+
+.fin-chart-header span {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-xl);
+}
+
+.fin-chart-icon {
+  color: var(--color-primary);
+  opacity: 0.7;
+}
+
+.fin-empty {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* ── Loading skeleton ── */
+.fin-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  padding: 4rem 2rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.fin-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: fin-spin 0.8s linear infinite;
+}
+
+@keyframes fin-spin {
+  to { transform: rotate(360deg); }
+}

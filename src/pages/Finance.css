@@ -1,0 +1,82 @@
+/* Finance.css — Estilos principales del contenedor y navegación de Finanzas */
+
+.finance-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.finance-page-header h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Botones principales de pestaña (Métricas, Gastos, Nómina) */
+.fin-main-tabs {
+  display: flex;
+  gap: 0.6rem;
+  background: var(--color-surface-2);
+  padding: 0.35rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.fin-main-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-dark);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+
+.fin-main-tab:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text-dark);
+  border-color: var(--color-border);
+}
+
+.fin-main-tab.active {
+  background: var(--color-primary);
+  color: #ffffff !important;
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-md);
+}
+
+/* Soporte y visibilidad mejorada para Modo Oscuro */
+[data-theme="dark"] .fin-main-tabs {
+  background: rgba(22, 27, 34, 0.9);
+  border-color: #30363D;
+}
+
+[data-theme="dark"] .fin-main-tab {
+  color: #C9D1D9;
+}
+
+[data-theme="dark"] .fin-main-tab:hover {
+  background: #21262D;
+  color: #F0F6FC;
+  border-color: #484F58;
+}
+
+[data-theme="dark"] .fin-main-tab.active {
+  background: #1F6FEB;
+  color: #FFFFFF !important;
+  border-color: #58A6FF;
+  box-shadow: 0 4px 14px rgba(31, 111, 235, 0.4);
+}

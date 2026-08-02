@@ -1,0 +1,163 @@
+/* Root & Theme Variables */
+:root, [data-theme="light"] {
+  /* Brand Colors (Classic Venus Navy & Accents) */
+  --color-primary: #1A3644;
+  --color-primary-dark: #122631;
+  --color-primary-light: #24495C;
+  --color-accent-green: #2E7D32;
+  --color-accent-amber: #E67E22;
+  --color-accent-red: #D32F2F;
+  --color-accent-purple: #8E44AD;
+
+  /* Backgrounds */
+  --color-bg-dark: #EEF2F6;
+  --color-bg-radial: none;
+  
+  /* Surfaces */
+  --color-surface: #FFFFFF;
+  --color-surface-2: #DEE5ED;
+  --color-surface-3: #CBD5E1;
+  --color-surface-solid: #FFFFFF;
+
+  /* Typography */
+  --color-text-dark: #1A3644;
+  --color-text-light: #627D98;
+  --color-text-muted: #9FB3C8;
+
+  /* Borders & Shadows */
+  --color-border: #D1DCE5;
+  --color-border-subtle: rgba(26, 54, 68, 0.1);
+  --shadow-sm: 0 2px 8px rgba(26, 54, 68, 0.06);
+  --shadow-md: 0 4px 16px rgba(26, 54, 68, 0.08);
+  --shadow-lg: 0 8px 30px rgba(26, 54, 68, 0.12);
+  --shadow-glow: 0 0 15px rgba(26, 54, 68, 0.15);
+
+  /* Nav Item Colors for Light Mode */
+  --color-nav-bg-inactive: #DEE5ED;
+  --color-nav-text-inactive: #1A3644;
+  --color-nav-bg-active: #1A3644;
+  --color-nav-text-active: #FFFFFF;
+
+  /* Utilities */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --transition-fast: 0.15s ease-in-out;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  /* Brand Colors */
+  --color-primary: #58A6FF;
+  --color-primary-dark: #1f6feb;
+  --color-primary-light: #79c0ff;
+  --color-accent-green: #3FB950;
+  --color-accent-amber: #D29922;
+  --color-accent-red: #F85149;
+  --color-accent-purple: #A371F7;
+
+  /* Backgrounds */
+  --color-bg-dark: #090B0E;
+  --color-bg-radial: radial-gradient(circle at top right, #111b27, #090B0E 60%);
+  
+  /* Surfaces (Glassmorphism inspired) */
+  --color-surface: rgba(22, 27, 34, 0.7);
+  --color-surface-2: rgba(33, 38, 45, 0.8);
+  --color-surface-3: rgba(48, 54, 61, 0.9);
+  --color-surface-solid: #161B22;
+
+  /* Typography */
+  --color-text-dark: #F0F6FC;
+  --color-text-light: #8B949E;
+  --color-text-muted: #484F58;
+
+  /* Borders & Shadows */
+  --color-border: #30363D;
+  --color-border-subtle: rgba(240, 246, 252, 0.1);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(88, 166, 255, 0.2);
+
+  /* Nav Item Colors for Dark Mode */
+  --color-nav-bg-inactive: rgba(255, 255, 255, 0.05);
+  --color-nav-text-inactive: var(--color-text-light);
+  --color-nav-bg-active: rgba(88, 166, 255, 0.15);
+  --color-nav-text-active: var(--color-primary);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: var(--color-bg-dark);
+  background-image: var(--color-bg-radial);
+  background-attachment: fixed;
+  color: var(--color-text-dark);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Base Elements */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+/* Panel Utilities */
+.glass-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-dark); 
+}
+ 
+::-webkit-scrollbar-thumb {
+  background: var(--color-border); 
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted); 
+}
