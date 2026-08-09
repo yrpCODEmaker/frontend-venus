@@ -1,70 +1,81 @@
 import React, { useState, useEffect } from 'react';
-import { getToken } from '../services/api';
+import { getToken, getApiBaseUrl } from '../services/api';
 
-const ProtectedImage = ({ src, alt, className, style }) => {
-  const [imgSrc, setImgSrc] = useState(null);
-  const [error, setError] = useState(false);
+/**
+ * ProtectedImage — carga una imagen protegida por JWT.
+ *
+ * Estrategia: construye la URL absoluta del backend con el token como
+ * query param (?token=...) para que el <img> tag la cargue directamente
+ * sin necesidad de fetch() + CORS preflight.
+ *
+ * Si la URL ya es un blob: o data:, la usa directamente.
+ */
+const ProtectedImage = ({ src, alt, className, style, onClick }) => {
+  const [finalSrc, setFinalSrc] = useState(null);
 
   useEffect(() => {
-    let objectUrl = null;
-    let isMounted = true;
+    if (!src) {
+      setFinalSrc(null);
+      return;
+    }
 
-    const fetchImage = async () => {
-      if (!src) {
-        setImgSrc(null);
-        return;
-      }
+    // Blob o data URI locales — usarlos directamente
+    if (src.startsWith('blob:') || src.startsWith('data:')) {
+      setFinalSrc(src);
+      return;
+    }
 
-      // Si es un Blob local, data URI o imagen externa que no necesita protección
-      if (src.startsWith('blob:') || src.startsWith('data:') || !src.startsWith('http')) {
-        setImgSrc(src);
-        return;
-      }
+    const token = getToken();
+    const backendOrigin = getApiBaseUrl().replace(/\/api\/v1\/?$/, '');
 
-      try {
-        const token = getToken();
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    let absoluteUrl = src;
 
-        const response = await fetch(src, { headers });
-        if (!response.ok) throw new Error('Error al cargar la imagen');
+    // Si la URL ya apunta al endpoint /api/v1/images/ del backend → añadir token
+    if (src.startsWith('http://') || src.startsWith('https://')) {
+      absoluteUrl = src;
+    } else {
+      // Ruta relativa → hacer absoluta apuntando al backend
+      absoluteUrl = `${backendOrigin}/${src.replace(/^\/+/, '')}`;
+    }
 
-        const blob = await response.blob();
-        objectUrl = URL.createObjectURL(blob);
-        
-        if (isMounted) {
-          setImgSrc(objectUrl);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(true);
-        }
-      }
-    };
+    // Añadir token como query param si la URL es del backend y aún no lo tiene
+    if (token && !absoluteUrl.includes('token=')) {
+      const separator = absoluteUrl.includes('?') ? '&' : '?';
+      absoluteUrl = `${absoluteUrl}${separator}token=${encodeURIComponent(token)}`;
+    }
 
-    fetchImage();
-
-    return () => {
-      isMounted = false;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
+    setFinalSrc(absoluteUrl);
   }, [src]);
 
-  if (error || (!imgSrc && src)) {
+  if (!src) return null;
+
+  if (!finalSrc) {
+    // Placeholder mientras se construye la URL
     return (
-      <div 
-        className={`${className} flex items-center justify-center bg-gray-100 text-gray-400`}
-        style={style}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className={className} style={{ ...style, background: 'var(--color-surface-2, #f0f0f0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ opacity: 0.3 }}>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </div>
     );
   }
 
-  return <img src={imgSrc || ''} alt={alt || 'Imagen'} className={className} style={style} />;
+  return (
+    <img
+      src={finalSrc}
+      alt={alt || 'Imagen'}
+      className={className}
+      style={style}
+      onClick={onClick}
+      onError={(e) => {
+        // Si falla con el token, intentar sin él (por si es una URL pública)
+        if (e.target.src && e.target.src.includes('token=')) {
+          const urlWithoutToken = e.target.src.replace(/[?&]token=[^&]*/, '');
+          e.target.src = urlWithoutToken;
+        }
+      }}
+    />
+  );
 };
 
 export default ProtectedImage;

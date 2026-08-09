@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
-import { Plus, Search, Filter, ShoppingCart, Package, PlusCircle, MinusCircle, X, Image as ImageIcon } from 'lucide-react';
+import { Plus, Search, Filter, ShoppingCart, Package, PlusCircle, MinusCircle, X, Image as ImageIcon, Warehouse } from 'lucide-react';
 import ProtectedImage from '../components/ProtectedImage';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/formatters';
 import './Stock.css';
@@ -13,10 +13,10 @@ function Stock() {
   const [showModal, setShowModal] = useState(false);
   const [failedImages, setFailedImages] = useState({});
 
-  const safeMaterialesBase = config?.materiales || ['Madera Pino', 'Madera Caoba', 'MDF', 'Metal', 'Cristal'];
-  const safeTelasOptions = ['Ninguna (Sin Tela)', ...(config?.telas || ['Lino', 'Terciopelo', 'Sintético', 'Cuero', 'Yute'])];
-  const safeColoresTela = config?.colores || ['Rojo', 'Azul', 'Verde', 'Gris', 'Beige', 'Negro', 'Blanco'];
-  const safeColoresMat = ['None (Natural)', ...safeColoresTela];
+  const safeMaterialesBase = ['Ninguno', ...(config?.materiales || ['Madera Pino', 'Madera Caoba', 'MDF', 'Metal', 'Cristal']).filter(m => m.toLowerCase() !== 'ninguno')];
+  const safeTelasOptions = ['Ninguno', ...(config?.telas || ['Lino', 'Terciopelo', 'Sintético', 'Cuero', 'Yute']).filter(t => t.toLowerCase() !== 'ninguno' && t.toLowerCase() !== 'ninguna (sin tela)')];
+  const safeColoresTela = ['Ninguno', ...(config?.colores || ['Rojo', 'Azul', 'Verde', 'Gris', 'Beige', 'Negro', 'Blanco']).filter(c => c.toLowerCase() !== 'ninguno')];
+  const safeColoresMat = safeColoresTela;
   const safeAreas = config?.areas || ['Tapicería', 'Ebanistería'];
 
   // Form state
@@ -110,19 +110,26 @@ function Stock() {
 
     const selectedModel = catalogo.find(c => String(c.id) === String(catalogoId));
     
-    // Consolidar Material y Tela como arreglos JSON
-    let materialArray = [materialBase];
-    const matColorStr = colorMaterial && !colorMaterial.startsWith('None') ? colorMaterial : 'Natural (None)';
-    materialArray.push(matColorStr);
+    // Consolidar Material y Tela como arreglos JSON o null
+    const isMatNinguno = !materialBase || materialBase.toLowerCase() === 'ninguno';
+    const isMatColorNinguno = !colorMaterial || colorMaterial.toLowerCase() === 'ninguno';
 
-    let telaArray = null;
-    if (tipoTela && !tipoTela.startsWith('Ninguna')) {
-      telaArray = [tipoTela];
-      if (colorTela) telaArray.push(colorTela);
+    let finalMaterial = null;
+    if (!isMatNinguno) {
+      const matArray = [materialBase];
+      if (!isMatColorNinguno) matArray.push(colorMaterial);
+      finalMaterial = JSON.stringify(matArray);
     }
 
-    const finalMaterial = JSON.stringify(materialArray);
-    const finalTela = telaArray ? JSON.stringify(telaArray) : null;
+    const isTelaNinguno = !tipoTela || tipoTela.toLowerCase().startsWith('ningun');
+    const isTelaColorNinguno = !colorTela || colorTela.toLowerCase() === 'ninguno';
+
+    let finalTela = null;
+    if (!isTelaNinguno) {
+      const telaArray = [tipoTela];
+      if (!isTelaColorNinguno) telaArray.push(colorTela);
+      finalTela = JSON.stringify(telaArray);
+    }
 
     const success = await addStockItem({
       catalogo_id: catalogoId,
@@ -143,6 +150,14 @@ function Stock() {
 
   return (
     <div className="page-container animate-fade-in">
+      {/* Encabezado del Módulo */}
+      <div className="module-header glass-panel">
+        <h1>
+          <Warehouse size={22} className="module-header-icon" />
+          Inventario de Stock
+        </h1>
+      </div>
+
       {/* Bar de Filtros con Botón de Acción integrado */}
       <div className="filter-bar glass-panel">
         <div className="search-box">

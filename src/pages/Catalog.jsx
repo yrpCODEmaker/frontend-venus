@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
-import { Plus, Search, Filter, ShoppingCart, Image as ImageIcon, X, Trash2, SlidersHorizontal, Pencil } from 'lucide-react';
+import { Plus, Search, Filter, ShoppingCart, Image as ImageIcon, X, Trash2, SlidersHorizontal, Pencil, PackageSearch } from 'lucide-react';
 import ProtectedImage from '../components/ProtectedImage';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/formatters';
 import './Catalog.css';
@@ -18,10 +18,10 @@ function Catalog() {
   // Listas configuradas dinámicamente desde la BD
   const safeAreas = config?.areas || ['Tapicería', 'Ebanistería', 'Pintura', 'Costura'];
   const safeTipos = config?.tipos || ['Sofá', 'Cama', 'Comedor', 'Mesa', 'Sillón'];
-  const safeMaterialesBase = config?.materiales || ['Madera Pino', 'Madera Caoba', 'MDF', 'Metal', 'Cristal'];
-  const safeTelasOptions = ['Ninguna (Sin Tela)', ...(config?.telas || ['Lino', 'Terciopelo', 'Sintético', 'Cuero', 'Yute'])];
-  const safeColoresTela = config?.colores || ['Rojo', 'Azul', 'Verde', 'Gris', 'Beige', 'Negro', 'Blanco'];
-  const safeColoresMat = ['None (Natural)', ...safeColoresTela];
+  const safeMaterialesBase = ['Ninguno', ...(config?.materiales || ['Madera Pino', 'Madera Caoba', 'MDF', 'Metal', 'Cristal']).filter(m => m.toLowerCase() !== 'ninguno')];
+  const safeTelasOptions = ['Ninguno', ...(config?.telas || ['Lino', 'Terciopelo', 'Sintético', 'Cuero', 'Yute']).filter(t => t.toLowerCase() !== 'ninguno' && t.toLowerCase() !== 'ninguna (sin tela)')];
+  const safeColoresTela = ['Ninguno', ...(config?.colores || ['Rojo', 'Azul', 'Verde', 'Gris', 'Beige', 'Negro', 'Blanco']).filter(c => c.toLowerCase() !== 'ninguno')];
+  const safeColoresMat = safeColoresTela;
 
   // Form state Modelo al Catálogo (Creación o Edición Versionada)
   const [editingModelId, setEditingModelId] = useState(null);
@@ -35,7 +35,7 @@ function Catalog() {
   // Modal Personalización de Encargo
   const [selectedModel, setSelectedModel] = useState(null);
   const [orderMaterial, setOrderMaterial] = useState('');
-  const [orderMaterialColor, setOrderMaterialColor] = useState('None (Natural)');
+  const [orderMaterialColor, setOrderMaterialColor] = useState('Ninguno');
   const [orderTela, setOrderTela] = useState('');
   const [orderTelaColor, setOrderTelaColor] = useState('');
   const [orderPrice, setOrderPrice] = useState('');
@@ -43,6 +43,8 @@ function Catalog() {
   const [orderQty, setOrderQty] = useState('1');
   const [orderImageFile, setOrderImageFile] = useState(null);
   const [orderImagePreview, setOrderImagePreview] = useState(null);
+  const [supportImagesFiles, setSupportImagesFiles] = useState([]);
+  const [supportImagesPreviews, setSupportImagesPreviews] = useState([]);
 
   const areasList = ['Todos', ...safeAreas];
   const tiposList = ['Todos', ...safeTipos];
@@ -96,15 +98,17 @@ function Catalog() {
 
   const handleOpenOrderModal = (model) => {
     setSelectedModel(model);
-    setOrderMaterial(safeMaterialesBase[0] || 'Madera Pino');
-    setOrderMaterialColor('None (Natural)');
-    setOrderTela(safeTelasOptions[1] || 'Terciopelo');
-    setOrderTelaColor(safeColoresTela[0] || 'Gris');
+    setOrderMaterial(safeMaterialesBase[1] || safeMaterialesBase[0] || 'Ninguno');
+    setOrderMaterialColor('Ninguno');
+    setOrderTela(safeTelasOptions[1] || safeTelasOptions[0] || 'Ninguno');
+    setOrderTelaColor('Ninguno');
     setOrderPrice(model.precio_base !== undefined ? model.precio_base.toString() : '');
     setOrderDesc('');
     setOrderQty('1');
     setOrderImageFile(null);
     setOrderImagePreview(null);
+    setSupportImagesFiles([]);
+    setSupportImagesPreviews([]);
   };
 
   const handleCloseOrderModal = () => {
@@ -115,8 +119,29 @@ function Catalog() {
     const file = e.target.files[0];
     if (file) {
       setOrderImageFile(file);
-      setOrderImagePreview(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onload = (ev) => setOrderImagePreview(ev.target.result);
+      reader.readAsDataURL(file);
     }
+  };
+
+  const handleSupportImagesChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+      setSupportImagesFiles(prev => [...prev, ...files]);
+      files.forEach(f => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setSupportImagesPreviews(prev => [...prev, ev.target.result]);
+        };
+        reader.readAsDataURL(f);
+      });
+    }
+  };
+
+  const handleRemoveSupportImage = (index) => {
+    setSupportImagesFiles(prev => prev.filter((_, i) => i !== index));
+    setSupportImagesPreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSaveCatalog = async (e) => {
@@ -164,22 +189,30 @@ function Catalog() {
     e.preventDefault();
     if (!selectedModel) return;
 
-    const hasTela = orderTela && !orderTela.startsWith('Ninguna');
-    
-    let materialArray = [orderMaterial];
-    const matColorStr = orderMaterialColor && !orderMaterialColor.startsWith('None') ? orderMaterialColor : 'Natural (None)';
-    materialArray.push(matColorStr);
+    const isMatNinguno = !orderMaterial || orderMaterial.toLowerCase() === 'ninguno';
+    const isMatColorNinguno = !orderMaterialColor || orderMaterialColor.toLowerCase() === 'ninguno';
 
-    let telaArray = null;
-    if (hasTela) {
-      telaArray = [orderTela];
-      if (orderTelaColor) {
-        telaArray.push(orderTelaColor);
+    let finalMaterial = null;
+    if (!isMatNinguno) {
+      const matArray = [orderMaterial];
+      if (!isMatColorNinguno) {
+        matArray.push(orderMaterialColor);
       }
+      finalMaterial = JSON.stringify(matArray);
     }
 
-    const finalMaterial = JSON.stringify(materialArray);
-    const finalTela = telaArray ? JSON.stringify(telaArray) : null;
+    const isTelaNinguno = !orderTela || orderTela.toLowerCase().startsWith('ningun');
+    const isTelaColorNinguno = !orderTelaColor || orderTelaColor.toLowerCase() === 'ninguno';
+
+    let finalTela = null;
+    if (!isTelaNinguno) {
+      const telaArray = [orderTela];
+      if (!isTelaColorNinguno) {
+        telaArray.push(orderTelaColor);
+      }
+      finalTela = JSON.stringify(telaArray);
+    }
+
     const finalPrice = parseFloat(orderPrice) || selectedModel.precio_base || 0;
 
     addToCart({
@@ -191,7 +224,9 @@ function Catalog() {
       descripcion: orderDesc,
       cantidad: parseInt(orderQty) || 1,
       image_preview: orderImagePreview || selectedModel.image_url || '',
-      image_file: orderImageFile
+      image_file: orderImageFile,
+      imagenes_apoyo_files: supportImagesFiles,
+      imagenes_apoyo_previews: supportImagesPreviews
     }, false);
 
     handleCloseOrderModal();
@@ -199,6 +234,14 @@ function Catalog() {
 
   return (
     <div className="page-container animate-fade-in">
+      {/* Encabezado del Módulo */}
+      <div className="module-header glass-panel">
+        <h1>
+          <PackageSearch size={22} className="module-header-icon" />
+          Catálogo de Productos
+        </h1>
+      </div>
+
       {/* Bar de Filtros con Botón de Acción integrado */}
       <div className="filter-bar glass-panel">
         <div className="search-box">
@@ -454,7 +497,11 @@ function Catalog() {
 
                 <div className="input-group">
                   <label>Color del Material Base</label>
-                  <select value={orderMaterialColor} onChange={e => setOrderMaterialColor(e.target.value)}>
+                  <select 
+                    value={orderMaterialColor} 
+                    onChange={e => setOrderMaterialColor(e.target.value)}
+                    disabled={!orderMaterial || orderMaterial.toLowerCase() === 'ninguno'}
+                  >
                     {safeColoresMat.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
@@ -474,7 +521,7 @@ function Catalog() {
                   <select 
                     value={orderTelaColor} 
                     onChange={e => setOrderTelaColor(e.target.value)}
-                    disabled={orderTela && orderTela.startsWith('Ninguna')}
+                    disabled={!orderTela || orderTela.toLowerCase().startsWith('ningun')}
                   >
                     {safeColoresTela.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -529,7 +576,7 @@ function Catalog() {
               </div>
 
               <div className="input-group">
-                <label>Imagen de Referencia del Cliente (para Taller)</label>
+                <label>Imagen Principal de Referencia (Reemplaza foto del catálogo en Taller)</label>
                 <input 
                   type="file" 
                   accept="image/*" 
@@ -541,8 +588,35 @@ function Catalog() {
                       <img src={orderImagePreview} alt="Referencia Encargo" />
                     </div>
                     <button type="button" className="btn-remove-image" onClick={() => { setOrderImageFile(null); setOrderImagePreview(null); }}>
-                      <Trash2 size={14} /> Eliminar foto de referencia
+                      <Trash2 size={14} /> Eliminar foto principal
                     </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="input-group">
+                <label>Imágenes de Apoyo (Texturas, Patrones, Pintura - Múltiples fotos)</label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  multiple
+                  onChange={handleSupportImagesChange} 
+                />
+                {supportImagesPreviews.length > 0 && (
+                  <div className="support-previews-grid">
+                    {supportImagesPreviews.map((prev, idx) => (
+                      <div key={idx} className="support-preview-item">
+                        <img src={prev} alt={`Apoyo ${idx + 1}`} />
+                        <button 
+                          type="button" 
+                          className="btn-remove-support-img" 
+                          onClick={() => handleRemoveSupportImage(idx)}
+                          title="Eliminar foto de apoyo"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

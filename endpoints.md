@@ -2,7 +2,7 @@
 
 Esta documentación describe la API REST completa de Venus Backend (FastAPI + SQLite WAL), organizada por módulos funcionales, con sus tipos de datos, cuerpos de solicitud, parámetros y respuestas.
 
-> **Última actualización:** Fase 6 — Implementación de permisos granulares por módulo.
+> **Última actualización:** Fase 7 — Endpoints de descarga de facturas en PDF y PNG.
 
 ---
 
@@ -196,26 +196,112 @@ Esta documentación describe la API REST completa de Venus Backend (FastAPI + SQ
 ## 2. Autenticación (`/api/v1/auth`)
 
 ### `POST` `/api/v1/auth/login`
-* **Resumen:** Login de Usuario
+* **Resumen:** Login de Usuario con Seguridad Avanzada (Rate Limit, 2FA, IP Inteligente)
 * **Descripción:** Autentica un usuario y retorna un Token JWT de acceso (Bearer).
+  * **Control de intentos:** Tras 3 intentos fallidos, bloquea la cuenta por 5 minutos si no tiene 2FA, o exige código OTP si tiene 2FA.
+  * **Regla Anti-Ingeniería Inversa:** Si se envía `otp_code` sin requerirse, bloquea la cuenta por 5 minutos.
+  * **Smart Login:** Exige OTP automáticamente si la IP del cliente proviene del exterior o es sospechosa.
 
-**Request Body:** `application/x-www-form-urlencoded`
-```form
-username=pichardo
-password=admin123
+**Request Body:** `application/x-www-form-urlencoded` o `application/json` (`LoginRequest`)
+```json
+{
+  "username": "pichardo",
+  "password": "admin123",
+  "otp_code": "123456"
+}
 ```
 
 **Respuestas:**
-- **200 OK**:
+- **200 OK (Autenticado):**
   ```json
   {
     "access_token": "eyJhbGci...",
     "token_type": "bearer",
-    "expires_in": 86400
+    "expires_in": 3600,
+    "requires_otp": false,
+    "message": "Inicio de sesión exitoso"
   }
   ```
-- **401 Unauthorized**: Credenciales incorrectas.
-- **403 Forbidden**: Cuenta desactivada.
+- **200 OK (Requiere OTP):**
+  ```json
+  {
+    "access_token": null,
+    "token_type": "bearer",
+    "expires_in": null,
+    "requires_otp": true,
+    "message": "Se requiere código de autenticación (OTP) de 6 dígitos."
+  }
+  ```
+- **401 Unauthorized:** Credenciales inválidas o código OTP incorrecto.
+- **403 Forbidden:** Cuenta desactivada.
+- **429 Too Many Requests:** Cuenta bloqueada por 5 minutos tras 3 intentos fallidos o por detección de ingeniería inversa.
+
+---
+
+### `POST` `/api/v1/auth/2fa/setup`
+* **Resumen:** Configurar 2FA / Generar QR
+* **Descripción:** Genera la clave secreta TOTP preliminar y el código QR en Base64 PNG para escanear en la app autenticadora.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Respuestas:**
+- **200 OK:**
+  ```json
+  {
+    "secret": "JBSWY3DPEHPK3PXP",
+    "qr_code_base64": "data:image/png;base64,iVBORw0KGgo...",
+    "otpauth_url": "otpauth://totp/Venus%20App:pichardo?secret=JBSWY3DPEHPK3PXP&issuer=Venus%20App"
+  }
+  ```
+
+---
+
+### `POST` `/api/v1/auth/2fa/enable`
+* **Resumen:** Activar 2FA
+* **Descripción:** Valida 1 código OTP generado por la app autenticadora para confirmar la sincronización y habilitar `totp_enabled = 1`.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:** `application/json`
+```json
+{
+  "otp_code": "123456"
+}
+```
+
+**Respuestas:**
+- **200 OK:** `{"enabled": true}`
+- **400 Bad Request:** Código OTP inválido o no se ha llamado primero a `/2fa/setup`.
+
+---
+
+### `POST` `/api/v1/auth/2fa/disable`
+* **Resumen:** Desactivar 2FA
+* **Descripción:** Desactiva la autenticación de dos factores para el usuario.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Request Body:** `application/json`
+```json
+{
+  "password": "admin123"
+}
+```
+
+**Respuestas:**
+- **200 OK:** `{"enabled": false}`
+- **400 Bad Request:** Se requiere contraseña válida o código OTP para desactivar.
+
+---
+
+### `GET` `/api/v1/auth/2fa/status`
+* **Resumen:** Estado de 2FA
+* **Descripción:** Consulta si el usuario autenticado tiene activa la autenticación de dos factores.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Respuestas:**
+- **200 OK:** `{"enabled": true}`
 
 ---
 
@@ -392,6 +478,53 @@ password=admin123
 
 ---
 
+#### `GET` `/api/v1/facturas/{factura_id}/download/pdf`
+* **Resumen:** Descargar Factura en PDF
+* **Descripción:** Genera y descarga la factura como archivo PDF. La información de empresa (nombre, logo, teléfono, ubicación, RNC) se carga desde `company_config.json` en la raíz del proyecto. Si el campo `rnc` es `null` o vacío, no se menciona el RNC en la factura.
+* **Permiso requerido:** `facturas_ver`
+
+**Parámetros:**
+- `factura_id` [path] (string, Requerido): ID de la factura.
+
+**Respuestas:**
+- **200 OK**: Archivo PDF descargable.
+  - `Content-Type: application/pdf`
+  - `Content-Disposition: attachment; filename="factura_{id}.pdf"`
+- **401 Unauthorized**: Token no proporcionado o inválido.
+- **404 Not Found**: Factura no encontrada.
+
+---
+
+#### `GET` `/api/v1/facturas/{factura_id}/download/png`
+* **Resumen:** Descargar Factura en PNG
+* **Descripción:** Genera y descarga la factura como imagen PNG de alta resolución (150 DPI). Idéntica visualmente al PDF. La info de empresa se carga desde `company_config.json`.
+* **Permiso requerido:** `facturas_ver`
+
+**Parámetros:**
+- `factura_id` [path] (string, Requerido): ID de la factura.
+
+**Respuestas:**
+- **200 OK**: Imagen PNG descargable.
+  - `Content-Type: image/png`
+  - `Content-Disposition: attachment; filename="factura_{id}.png"`
+- **401 Unauthorized**: Token no proporcionado o inválido.
+- **404 Not Found**: Factura no encontrada.
+
+> **⚙️ Configuración de empresa para facturas:**
+> Edita `company_config.json` en la raíz del proyecto para cambiar el nombre, logo, teléfono, ubicación o RNC de la empresa sin modificar código.
+>
+> ```json
+> {
+>   "nombre": "Venus Muebles",
+>   "logo_path": null,
+>   "ubicacion": "Santo Domingo, RD",
+>   "telefono": "+1 (809) 000-0000",
+>   "rnc": null
+> }
+> ```
+
+---
+
 ### 🔨 Ítems (Producción / Kanban)
 
 #### `GET` `/api/v1/items`
@@ -455,7 +588,7 @@ password=admin123
 
 #### `PATCH` `/api/v1/items/{item_id}`
 * **Resumen:** Modificar Ítem
-* **Descripción:** Modifica tela, material, descripción o subtotal de un ítem.
+* **Descripción:** Modifica color, material, descripción o subtotal de un ítem.
 
 **Respuestas:**
 - **200 OK**: Ítem actualizado.
@@ -622,7 +755,7 @@ password=admin123
 
 #### `POST` `/api/v1/catalogo`
 * **Resumen:** Crear Plantilla de Catálogo (Con foto obligatoria)
-* **Descripción:** Crea un modelo en el catálogo subiendo obligatoriamente su foto mediante un formulario `multipart/form-data`. El backend guarda la imagen en disco (`/uploads/{prefix}/`), calcula su hash SHA-256 (desduplicando si ya existe), la registra en la tabla `images` y vincula el `image_id` resultante al nuevo registro de catálogo.
+* **Descripción:** Crea un modelo en el catálogo subiendo obligatoriamente su foto mediante un formulario `multipart/form-data`. El backend guarda la imagen en disco (`/uploads/{prefix}/`), la registra en la tabla `images` y vincula el `image_id` resultante al nuevo registro de catálogo.
 
 **Request Body:** `multipart/form-data`
 - `nombre` (string, Form, Requerido): Nombre del modelo (ej: `"Juego de Habitación King"`).
@@ -660,15 +793,15 @@ password=admin123
 ### 📦 Stock (Inventario)
 
 #### `GET` `/api/v1/stock`
-* **Descripción:** Obtiene las variantes de inventario actual consolidando datos de catálogo y resolviendo la ruta de la imagen (`file_path`, `image_src`, `url_imagen`, `aspect_ratio`). *Nota: El stock con cantidad <= 0 o marcado como eliminado (`deleted_at IS NOT NULL`) es automáticamente excluido.*
+* **Descripción:** Obtiene las variantes de inventario actual consolidando datos de catálogo y resolviendo la ruta de la imagen (`file_path`, `image_src`, `url_imagen`). *Nota: El stock con cantidad <= 0 o marcado como eliminado (`deleted_at IS NOT NULL`) es automáticamente excluido.*
 
 #### `POST` `/api/v1/stock`
 * **Resumen:** Crear Variante de Stock (Con imagen opcional)
-* **Descripción:** Crea una variante de stock asociada a un catálogo mediante `multipart/form-data`. Hereda automáticamente la foto genérica del catálogo si no se sube una imagen propia. Si se envía una imagen en el campo `file`, calcula su hash SHA-256 (desduplicando si ya existe), la guarda en disco en `/uploads/{prefix}/`, se inserta en la tabla `images` y se asigna su nuevo `image_id`.
+* **Descripción:** Crea una variante de stock asociada a un catálogo mediante `multipart/form-data`. Hereda automáticamente la foto genérica del catálogo si no se sube una imagen propia. Si se envía una imagen en el campo `file`, se guarda en disco en `/uploads/{prefix}/`, se inserta en la tabla `images` y se asigna su nuevo `image_id`.
 
 **Request Body:** `multipart/form-data`
 - `catalogo_id` (string, Form, Requerido): ID del catálogo al que pertenece.
-- `tela` / `color` (string, Form, Opcional): Tela/color específico de la variante.
+- `color` (string, Form, Opcional): Color específico de la variante.
 - `material` (string, Form, Opcional): Material de la variante.
 - `descripcion` (string, Form, Opcional): Detalles adicionales.
 - `cantidad` (integer, Form, Opcional, por defecto `0`): Cantidad inicial en stock.
@@ -681,7 +814,6 @@ password=admin123
   {
     "id": "LRs1t2u3v4",
     "catalogo_id": "LRa1b2c3d4",
-    "tela": "Gris Plomo",
     "color": "Gris Plomo",
     "material": "Terciopelo",
     "descripcion": "Stock entrega inmediata",
@@ -807,7 +939,7 @@ password=admin123
 
 ### `POST` `/api/v1/sync/upload_image`
 * **Resumen:** Subir Imagen Física (Desktop)
-* **Descripción:** Recibe una imagen enviada por la app desktop (`multipart/form-data`: `local_image_id`, `file`), calcula su hash SHA-256 (desduplicando si ya existe), la guarda en `/uploads/{prefix}/`, calcula su `aspect_ratio` y actualiza/inserta la ruta, hash y `aspect_ratio` en la tabla `images`.
+* **Descripción:** Recibe una imagen enviada por la app desktop (`multipart/form-data`: `local_image_id`, `file`), la guarda en `/uploads/{prefix}/`, calcula su relación de aspecto (`aspect_ratio = width / height`) mediante `Pillow` y actualiza/inserta la ruta y el `aspect_ratio` en la tabla `images`.
 
 ---
 
@@ -843,8 +975,6 @@ password=admin123
 ### `GET` `/health`
 * **Resumen:** Health Check
 * **Descripción:** Retorna `{"status": "ok"}` para validar que el servicio está activo.
-
----
 
 *Última actualización: 2026-08-02 — Desduplicación de imágenes por hash SHA-256*
 - Cálculo de hash SHA-256 en la subida de imágenes (`POST /catalogo`, `PUT/PATCH /catalogo/{id}`, `POST /stock`, `POST /sync/upload_image`) y almacenamiento en la nueva columna `hash TEXT` de la tabla `images`.

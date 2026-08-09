@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import InvoicePDF from '../components/InvoicePDF';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
-import { formatCurrency, formatCurrencyInput, parseCurrencyInput, formatPhoneInput, formatItemJSON } from '../utils/formatters';
-import { ShoppingCart, ReceiptText, Plus, Trash2, UserPlus, DollarSign, Search, Eye, CheckCircle, Truck, X, UserCheck, Zap, Loader2 } from 'lucide-react';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput, formatPhoneInput, formatItemJSON, formatArea, formatMaterialAndTela, cleanFieldValue } from '../utils/formatters';
+import { ShoppingCart, ReceiptText, Plus, Trash2, UserPlus, DollarSign, Search, Eye, CheckCircle, Truck, X, UserCheck, Zap, Loader2, FileDown, Image } from 'lucide-react';
 import './Invoices.css';
 
 function Invoices() {
@@ -22,8 +20,33 @@ function Invoices() {
   const [isSelectingClient, setIsSelectingClient] = useState(false);
   const [clientSearchText, setClientSearchText] = useState('');
   
-  // Estado para detalles expandidos de item en modal
   const [expandedItemId, setExpandedItemId] = useState(null);
+
+  // Estado de descarga de facturas
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingPng, setDownloadingPng] = useState(false);
+
+  const handleDownloadPdf = async (facturaId) => {
+    setDownloadingPdf(true);
+    try {
+      await api.downloadFacturaPdf(facturaId);
+    } catch (err) {
+      showNotification(`Error al generar PDF: ${err.message}`, 'error');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  const handleDownloadPng = async (facturaId) => {
+    setDownloadingPng(true);
+    try {
+      await api.downloadFacturaPng(facturaId);
+    } catch (err) {
+      showNotification(`Error al generar PNG: ${err.message}`, 'error');
+    } finally {
+      setDownloadingPng(false);
+    }
+  };
 
   // Facturación Rápida (Casilla y 3 campos)
   const [isFastBilling, setIsFastBilling] = useState(false);
@@ -32,7 +55,8 @@ function Invoices() {
   const [fastTelefono, setFastTelefono] = useState('');
 
   // Form para Nueva Factura
-  const [montoPagado, setMontoPagado] = useState('');
+  const [isPartialPayment, setIsPartialPayment] = useState(false);
+  const [montoPagadoInput, setMontoPagadoInput] = useState('');
   const [entregaDomicilio, setEntregaDomicilio] = useState(false);
   const [direccionEntrega, setDireccionEntrega] = useState('');
   const [garantiaHasta, setGarantiaHasta] = useState('1 Año');
@@ -49,7 +73,8 @@ function Invoices() {
   const [montoAbono, setMontoAbono] = useState('');
   const [notaAbono, setNotaAbono] = useState('');
   const totalCart = (cart || []).reduce((sum, item) => sum + (item.precio * item.cantidad), 0);
-  const restanteCart = Math.max(0, totalCart - (parseFloat(montoPagado) || 0));
+  const effectiveMontoPagado = isPartialPayment ? (parseFloat(montoPagadoInput) || 0) : totalCart;
+  const restanteCart = Math.max(0, totalCart - effectiveMontoPagado);
 
   const getFullFactura = (factura) => {
     if (!factura) return null;
@@ -127,19 +152,120 @@ function Invoices() {
       return;
     }
 
-    // Formatear ítems según esquema estricto FastAPI (tipo y subtotal requeridos)
-    const formattedItems = cart.map(item => ({
-      stock_id: item.isStock ? String(item.id) : null,
-      catalogo_id: item.catalogo_id ? String(item.catalogo_id) : (item.id ? String(item.id) : null),
-      nombre: item.nombre || 'Producto',
-      cantidad: parseInt(item.cantidad) || 1,
-      tipo: item.isStock ? 'stock' : 'encargo',
-      subtotal: parseFloat(item.precio * item.cantidad) || 0,
-      tela: item.tela || null,
-      material: item.material || 'Por definir',
-      descripcion: item.descripcion || '',
-      area: Array.isArray(item.area) ? item.area.join(', ') : (item.area || 'Tapicería'),
-      tipo_mueble: item.tipo_mueble || item.tipo || 'Mueble'
+    // Helper para reconvertir Data URIs de localStorage en archivos subibles
+    const dataURLtoFile = (dataurl, filename = 'imagen.jpg') => {
+      if (!dataurl || typeof dataurl !== 'string' || !dataurl.startsWith('data:')) return null;
+      try {
+        const arr = dataurl.split(',');
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, { type: mime });
+      } catch (e) {
+        console.error("Error convirtiendo Data URI a File:", e);
+        return null;
+      }
+    };
+
+    // Formatear ítems procesando imágenes principales y de apoyo si fueron adjuntadas
+    const formattedItems = await Promise.all(cart.map(async (item) => {
+      let mainImageId = item.image_id || null;
+      let mainFileToUpload = item.image_file;
+      if (!mainFileToUpload && item.image_preview && typeof item.image_preview === 'string' && item.image_preview.startsWith('data:')) {
+        mainFileToUpload = dataURLtoFile(item.image_preview, 'foto_principal.jpg');
+      }
+
+      if (mainFileToUpload) {
+        try {
+          const uploadRes = await api.uploadImage(mainFileToUpload);
+          if (uploadRes && uploadRes.id) {
+            mainImageId = uploadRes.id;
+          }
+        } catch (e) {
+          console.error("Error subiendo foto principal:", e);
+        }
+      }
+
+      let apoyoImageIds = [];
+      const rawApoyoList = [
+        ...(item.imagenes_apoyo_files || []),
+        ...(item.imagenes_apoyo_previews || []),
+        ...(item.imagenes_apoyo || [])
+      ];
+
+      // Eliminar duplicados
+      const uniqueApoyoList = Array.from(new Set(rawApoyoList));
+
+      if (uniqueApoyoList.length > 0) {
+        for (const fileItem of uniqueApoyoList) {
+          let fileToUpload = null;
+          if (fileItem instanceof File || (fileItem && typeof fileItem === 'object' && fileItem.name)) {
+            fileToUpload = fileItem;
+          } else if (typeof fileItem === 'string' && fileItem.startsWith('data:')) {
+            fileToUpload = dataURLtoFile(fileItem, 'imagen_apoyo.jpg');
+          }
+
+          if (fileToUpload) {
+            try {
+              const uploadRes = await api.uploadImage(fileToUpload);
+              if (uploadRes && uploadRes.id) {
+                apoyoImageIds.push(uploadRes.id);
+              }
+            } catch (e) {
+              console.error("Error subiendo imagen de apoyo:", e);
+            }
+          } else if (typeof fileItem === 'string' && fileItem.trim() !== '' && !fileItem.startsWith('data:') && !fileItem.startsWith('blob:')) {
+            apoyoImageIds.push(fileItem.trim());
+          }
+        }
+      }
+
+      const rawCatId = item.catalogo_id || (!item.isStock ? item.id : null);
+      const cleanCatId = (rawCatId && !String(rawCatId).startsWith('cart_')) ? String(rawCatId) : null;
+      const rawStockId = item.isStock ? item.id : item.stock_id;
+      const cleanStockId = (rawStockId && !String(rawStockId).startsWith('cart_')) ? String(rawStockId) : null;
+
+      const cleanParam = (val) => {
+        if (!val) return null;
+        const strVal = String(val).trim();
+        if (!strVal) return null;
+        const lower = strVal.toLowerCase();
+        if (['null', 'undefined', 'ninguno', 'ninguna', 'por definir', 'none'].includes(lower)) return null;
+        try {
+          const parsed = JSON.parse(strVal);
+          if (Array.isArray(parsed)) {
+            const validElems = parsed.filter(e => {
+              if (!e) return false;
+              const eStr = String(e).trim().toLowerCase();
+              return !['null', 'undefined', 'ninguno', 'ninguna', 'por definir', 'none'].includes(eStr);
+            });
+            if (validElems.length === 0) return null;
+            return JSON.stringify(validElems);
+          }
+        } catch {}
+        return strVal;
+      };
+
+      return {
+        stock_id: cleanStockId,
+        catalogo_id: cleanCatId,
+        image_id: mainImageId,
+        imagenes_apoyo: apoyoImageIds,
+        nombre: item.nombre || 'Producto',
+        cantidad: parseInt(item.cantidad) || 1,
+        tipo: item.isStock ? 'stock' : 'encargo',
+        subtotal: parseFloat(item.precio * item.cantidad) || 0,
+        tela: cleanParam(item.tela),
+        material: cleanParam(item.material),
+        descripcion: item.descripcion || '',
+        area: Array.isArray(item.area) ? item.area.join(', ') : (item.area || 'Tapicería'),
+        tipo_mueble: item.tipo_mueble || item.tipo || 'Mueble'
+      };
     }));
 
     // Estructura del cliente segun ClienteRapidoSchema del backend:
@@ -150,11 +276,16 @@ function Invoices() {
       telefono: fastTelefono.trim() || ''
     } : null;  // Para factura normal, el cliente se identifica por cliente_id
 
+    const effectiveMontoPagado = isPartialPayment 
+      ? (parseFloat(montoPagadoInput) || 0) 
+      : parseFloat(totalCart);
+
     const invoicePayload = {
       cliente_id: (!isFastBilling && selectedClienteId) ? String(selectedClienteId) : null,
       cliente: clientPayload,
       total: parseFloat(totalCart) || 0,
-      monto_pagado: parseFloat(montoPagado) || 0,
+      monto_pagado: effectiveMontoPagado,
+      pago_parcial: isPartialPayment ? 1 : 0,
       items: formattedItems,
       entrega_domicilio: Boolean(entregaDomicilio),
       direccion_entrega: direccionEntrega || (selectedClientObj ? selectedClientObj.domicilio : ''),
@@ -169,7 +300,8 @@ function Invoices() {
       setFastApellido('');
       setFastTelefono('');
       setIsFastBilling(false);
-      setMontoPagado('');
+      setIsPartialPayment(false);
+      setMontoPagadoInput('');
       setEntregaDomicilio(false);
       setDireccionEntrega('');
       setActiveTab('list');
@@ -245,7 +377,7 @@ function Invoices() {
           className={`tab-button ${activeTab === 'new' ? 'active' : ''}`}
           onClick={() => setActiveTab('new')}
         >
-          <ShoppingCart size={18} /> Nueva Factura ({cart.length} ítems)
+          <ShoppingCart size={18} /> Nueva Factura ({cart.length} productos)
         </button>
         <button 
           className={`tab-button ${activeTab === 'list' ? 'active' : ''}`}
@@ -259,33 +391,61 @@ function Invoices() {
       {activeTab === 'new' && (
         <div className="pos-container">
           <div className="pos-cart-panel glass-panel animate-fade-in">
-            <h2>Ítems en Factura</h2>
+            <h2>Productos en factura</h2>
             {cart.length === 0 ? (
               <div className="cart-empty">
                 <ShoppingCart size={48} className="text-muted" />
                 <p>El carrito está vacío.</p>
-                <small>Ve al Catálogo o Stock para agregar ítems.</small>
+                <small>Ve al Catálogo o Stock para agregar productos.</small>
               </div>
             ) : (
               <div className="cart-items-list">
                 {cart.map((item, index) => (
-                  <div key={index} className="cart-item-row">
-                    <div className="cart-item-info">
-                      <h4>{item.nombre}</h4>
-                      <p>{item.tela ? `Tela: ${formatItemJSON(item.tela)} | ` : ''}Material: {formatItemJSON(item.material)}</p>
-                      <span className="cart-item-price">${formatCurrency(item.precio)} c/u</span>
+                  <div key={index} className="cart-item-card glass-panel">
+                    <div className="cart-item-top">
+                      {item.image_preview && (
+                        <div className="cart-item-thumb">
+                          <img src={item.image_preview} alt={item.nombre} />
+                        </div>
+                      )}
+                      <div className="cart-item-main-details">
+                        <div className="cart-item-header">
+                          <h4 className="cart-item-title">{item.nombre}</h4>
+                          <button 
+                            type="button" 
+                            className="btn-remove-cart" 
+                            onClick={() => removeFromCart(index)}
+                            title="Eliminar producto"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+
+                        <div className="cart-item-specs-tags">
+                          {item.area && <span className="cart-spec-badge">Área: {formatArea(item.area)}</span>}
+                          {item.tipo_mueble && <span className="cart-spec-badge">Tipo: {item.tipo_mueble}</span>}
+                          {item.material && <span className="cart-spec-badge">Material: {cleanFieldValue(item.material)}</span>}
+                          {item.tela && <span className="cart-spec-badge">Tela: {cleanFieldValue(item.tela)}</span>}
+                          {cleanFieldValue(item.color) && <span className="cart-spec-badge">Color: {cleanFieldValue(item.color)}</span>}
+                        </div>
+
+                        {item.descripcion && (
+                          <p className="cart-item-desc-text">📝 {item.descripcion}</p>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="cart-item-actions">
-                      <div className="qty-controls">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); updateCartQuantity(index, -1); }}>-</button>
-                        <span>{item.cantidad}</span>
-                        <button type="button" onClick={(e) => { e.stopPropagation(); updateCartQuantity(index, 1); }}>+</button>
+                    <div className="cart-item-bottom">
+                      <span className="cart-item-unit-price">${formatCurrency(item.precio)} c/u</span>
+
+                      <div className="cart-item-footer-controls">
+                        <div className="qty-controls">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); updateCartQuantity(index, -1); }}>-</button>
+                          <span>{item.cantidad}</span>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); updateCartQuantity(index, 1); }}>+</button>
+                        </div>
+                        <span className="item-subtotal-val">${formatCurrency(item.precio * item.cantidad)}</span>
                       </div>
-                      <span className="item-subtotal">${formatCurrency(item.precio * item.cantidad)}</span>
-                      <button className="btn-remove" onClick={() => removeFromCart(index)}>
-                        <Trash2 size={16} />
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -487,20 +647,47 @@ function Invoices() {
                   <span className="total-amount">${formatCurrency(totalCart)}</span>
                 </div>
 
-                <div className="input-group">
-                  <label>Abono / Pago Inicial ($)</label>
-                  <input 
-                    type="text" 
-                    value={formatCurrencyInput(montoPagado)} 
-                    onChange={e => setMontoPagado(parseCurrencyInput(e.target.value))} 
-                    placeholder="0" 
-                  />
+                {/* Casilla ¿Pago Parcial? */}
+                <div className="checkbox-group partial-payment-checkbox">
+                  <label>
+                    <input 
+                      type="checkbox" 
+                      checked={isPartialPayment} 
+                      onChange={e => {
+                        setIsPartialPayment(e.target.checked);
+                        if (e.target.checked && !montoPagadoInput) {
+                          setMontoPagadoInput(totalCart > 0 ? (totalCart / 2).toString() : '0');
+                        }
+                      }} 
+                    />
+                    <strong>¿Pago Parcial / Abono Inicial?</strong>
+                  </label>
                 </div>
 
-                <div className="total-row rest">
-                  <span>Balance Pendiente</span>
-                  <span className="rest-amount">${formatCurrency(restanteCart)}</span>
-                </div>
+                {!isPartialPayment ? (
+                  <div className="payment-notice-full">
+                    <CheckCircle size={16} className="text-green" />
+                    <span>Factura por defecto con <strong>Pago Completo (${formatCurrency(totalCart)})</strong></span>
+                  </div>
+                ) : (
+                  <div className="partial-payment-fields animate-fade-in">
+                    <div className="input-group">
+                      <label>Monto Abonado Inicial ($) *</label>
+                      <input 
+                        type="text" 
+                        value={formatCurrencyInput(montoPagadoInput)} 
+                        onChange={e => setMontoPagadoInput(parseCurrencyInput(e.target.value))} 
+                        placeholder="Ej: 5,000"
+                        required={isPartialPayment}
+                      />
+                    </div>
+
+                    <div className="total-row rest">
+                      <span>Balance Pendiente a Dar Seguimiento</span>
+                      <span className="rest-amount">${formatCurrency(Math.max(0, totalCart - (parseFloat(montoPagadoInput) || 0)))}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button 
@@ -537,6 +724,7 @@ function Invoices() {
                 <tr>
                   <th>Folio</th>
                   <th>Cliente</th>
+                  <th>Tipo Pago</th>
                   <th>Total</th>
                   <th>Pagado</th>
                   <th>Balance</th>
@@ -547,10 +735,18 @@ function Invoices() {
               <tbody>
                 {filteredFacturas.map(fact => {
                   const pendiente = Math.max(0, (fact.total || 0) - (fact.monto_pagado || 0));
+                  const isPartial = fact.pago_parcial === 1 || (pendiente > 0 && fact.monto_pagado < fact.total);
                   return (
                     <tr key={fact.id}>
                       <td><strong>#{fact.id}</strong></td>
                       <td>{fact.cliente_nombre} {fact.cliente_apellido}</td>
+                      <td>
+                        {isPartial ? (
+                          <span className="badge-pago-parcial">Pago Parcial</span>
+                        ) : (
+                          <span className="badge-pago-completo">Pago Completo</span>
+                        )}
+                      </td>
                       <td>${formatCurrency(fact.total)}</td>
                       <td className="text-success">${formatCurrency(fact.monto_pagado)}</td>
                       <td className={pendiente > 0 ? "text-amber" : "text-muted"}>${formatCurrency(pendiente)}</td>
@@ -617,17 +813,32 @@ function Invoices() {
         <div className="modal-overlay">
           <div className="modal-content glass-panel animate-fade-in">
             <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <h2>Factura #{fullSelectedFactura.id}</h2>
-                
-                <PDFDownloadLink 
-                  document={<InvoicePDF factura={fullSelectedFactura} companyInfo={config?.company_info} />} 
-                  fileName={`Factura_Venus_${fullSelectedFactura.id}.pdf`}
-                  className="btn-action-primary"
-                  style={{ textDecoration: 'none', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+
+                <button
+                  id={`btn-download-pdf-${fullSelectedFactura.id}`}
+                  className="btn-download-invoice btn-download-pdf"
+                  onClick={() => handleDownloadPdf(fullSelectedFactura.id)}
+                  disabled={downloadingPdf}
+                  title="Descargar factura en PDF"
                 >
-                  {({ loading }) => (loading ? 'Generando PDF...' : 'Descargar PDF')}
-                </PDFDownloadLink>
+                  {downloadingPdf
+                    ? <><Loader2 size={14} className="spin-icon" /> Generando...</>
+                    : <><FileDown size={14} /> PDF</>}
+                </button>
+
+                <button
+                  id={`btn-download-png-${fullSelectedFactura.id}`}
+                  className="btn-download-invoice btn-download-png"
+                  onClick={() => handleDownloadPng(fullSelectedFactura.id)}
+                  disabled={downloadingPng}
+                  title="Descargar factura como imagen PNG"
+                >
+                  {downloadingPng
+                    ? <><Loader2 size={14} className="spin-icon" /> Generando...</>
+                    : <><Image size={14} /> PNG</>}
+                </button>
               </div>
               <button className="btn-icon" onClick={() => setSelectedFactura(null)}><X size={20} /></button>
             </div>
@@ -655,9 +866,9 @@ function Invoices() {
                         {expandedItemId === it.id && (
                           <div className="item-detail-accordion" style={{ marginTop: '0.5rem', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--primary-color)' }}>
                             <p style={{ margin: '0 0 0.25rem 0' }}><strong>Descripción:</strong> {it.descripcion || 'Sin descripción'}</p>
-                            <p style={{ margin: '0 0 0.25rem 0' }}><strong>Área / Tipo:</strong> {Array.isArray(it.area) ? it.area.join(', ') : it.area} / {it.tipo_mueble || it.tipo}</p>
-                            {it.tela && <p style={{ margin: '0 0 0.25rem 0' }}><strong>Tela:</strong> {formatItemJSON(it.tela)}</p>}
-                            <p style={{ margin: '0 0 0.5rem 0' }}><strong>Material:</strong> {formatItemJSON(it.material)}</p>
+                            <p style={{ margin: '0 0 0.25rem 0' }}><strong>Área / Tipo:</strong> {formatArea(it.area)} / {it.tipo_mueble || it.tipo}</p>
+                            {cleanFieldValue(it.color) && <p style={{ margin: '0 0 0.25rem 0' }}><strong>Color:</strong> {cleanFieldValue(it.color)}</p>}
+                            {formatMaterialAndTela(it.material, it.tela) && <p style={{ margin: '0 0 0.5rem 0' }}><strong>{formatMaterialAndTela(it.material, it.tela)}</strong></p>}
                             
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'grid', gridTemplateColumns: '1fr', gap: '0.25rem' }}>
                               <span><strong>Creado:</strong> {it.created_at ? new Date(it.created_at).toLocaleDateString() : 'N/A'}</span>

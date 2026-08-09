@@ -485,6 +485,52 @@
   background: rgba(211, 47, 47, 0.2);
 }
 
+/* Grid Previsualización de Imágenes de Apoyo */
+.support-previews-grid {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.support-preview-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+
+.support-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-remove-support-img {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: rgba(211, 47, 47, 0.85);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--transition-fast);
+}
+
+.btn-remove-support-img:hover {
+  transform: scale(1.15);
+}
+
 /* --- Mobile Responsiveness --- */
 @media (max-width: 640px) {
   .filter-group {

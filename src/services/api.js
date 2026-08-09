@@ -1,19 +1,75 @@
 // Servicio de API REST para Venus Backend (FastAPI / OAS 3.1)
 
-// Se usa window.location.hostname para adaptarse a IPs dinámicas en la red local.
-// De esta manera, si la IP de tu PC cambia (ej. de 192.168.1.32 a 192.168.1.45),
-// el frontend en los móviles buscará automáticamente en la IP correcta.
-const DEFAULT_BASE_URL = `http://${window.location.hostname}:8000/api/v1`;
+// Detecta el Hostname de la URL activa en el navegador del celular o PC
+const getRuntimeHost = () => {
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    const host = window.location.hostname;
+    if (host && host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') {
+      return host;
+    }
+  }
+  return null;
+};
+
+const RUNTIME_HOST = getRuntimeHost();
+const WINDOWS_LOCAL_IP = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_LOCAL_MACHINE_IP ? import.meta.env.VITE_LOCAL_MACHINE_IP : null;
+
+// IP preferida para celulares/LAN: 1) Hostname del celular, 2) IP de Windows inyectada por comando, 3) 127.0.0.1
+export const PRIMARY_LAN_IP = RUNTIME_HOST || WINDOWS_LOCAL_IP || '127.0.0.1';
+
+// Direcciones por defecto (API Local con IP de la PC primero -> Dominio como Fallback)
+export const LOCAL_BASE_URL = `http://${PRIMARY_LAN_IP}:8000/api/v1`;
+export const DOMAIN_BASE_URL = 'http://api.venusmuebles.com/api/v1';
+const DEFAULT_BASE_URL = LOCAL_BASE_URL;
+
+let activeAutoUrl = LOCAL_BASE_URL;
+
+/**
+ * Normaliza cualquier entrada de IP, Dominio o URL
+ * (ej: "api.venusmuebles.com" -> "http://api.venusmuebles.com/api/v1")
+ * (ej: "192.168.1.50" -> "http://192.168.1.50:8000/api/v1")
+ */
+export const formatApiUrl = (rawUrl) => {
+  if (!rawUrl || typeof rawUrl !== 'string') return DEFAULT_BASE_URL;
+  let clean = rawUrl.trim();
+  if (!clean) return DEFAULT_BASE_URL;
+
+  // Añadir http:// si no se especificó un protocolo
+  if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    clean = `http://${clean}`;
+  }
+
+  clean = clean.replace(/\/+$/, '');
+
+  // Si no termina en /api/v1
+  if (!clean.endsWith('/api/v1')) {
+    const hostWithoutProto = clean.replace(/^https?:\/\//, '');
+    const hasPort = /:\d+/.test(hostWithoutProto);
+    const isRawIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(hostWithoutProto) || hostWithoutProto.startsWith('localhost');
+
+    // Solo añadir :8000 si es una dirección IP numérica o localhost sin puerto explícito
+    if (!hasPort && isRawIp) {
+      clean = `${clean}:8000`;
+    }
+    clean = `${clean}/api/v1`;
+  }
+
+  return clean;
+};
 
 export const getApiBaseUrl = () => {
-  return localStorage.getItem('venus_api_url') || DEFAULT_BASE_URL;
+  const stored = localStorage.getItem('venus_api_url');
+  if (stored) return formatApiUrl(stored);
+  return activeAutoUrl;
 };
 
 export const setApiBaseUrl = (url) => {
   if (url) {
-    localStorage.setItem('venus_api_url', url);
+    const formatted = formatApiUrl(url);
+    localStorage.setItem('venus_api_url', formatted);
   } else {
     localStorage.removeItem('venus_api_url');
+    activeAutoUrl = LOCAL_BASE_URL;
   }
 };
 
@@ -57,21 +113,31 @@ export const setForbiddenListener = (listener) => {
 export const extractImageUrl = (item) => {
   if (!item) return '';
 
+  const token = getToken();
+  const appendTokenIfNeeded = (url) => {
+    if (!url) return '';
+    if (token && url.includes('/api/v1/images/') && !url.includes('token=')) {
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}token=${encodeURIComponent(token)}`;
+    }
+    return url;
+  };
+
   // 1. Prioridad: Usar endpoint protegido /api/v1/images/{id} que requiere JWT
   if (item.image_id || item.resolved_image_id) {
     const imgId = item.resolved_image_id || item.image_id;
     const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
-    return `${baseUrl}/images/${imgId}`;
+    return appendTokenIfNeeded(`${baseUrl}/images/${imgId}`);
   }
 
   // 2. Si el servidor ya devuelve image_url (viene resuelta con fallback al catalogo)
   if (item.image_url) {
     const rawUrl = item.image_url;
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
-      return rawUrl;
+      return appendTokenIfNeeded(rawUrl);
     }
     const backendOrigin = getApiBaseUrl().replace(/\/api\/v1\/?$/, '');
-    return `${backendOrigin}/${rawUrl.replace(/^\/+/, '')}`;
+    return appendTokenIfNeeded(`${backendOrigin}/${rawUrl.replace(/^\/+/, '')}`);
   }
 
   // 3. Fallback a file_path / image_src / url_imagen
@@ -80,11 +146,11 @@ export const extractImageUrl = (item) => {
   if (!rawUrl) return '';
 
   if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('blob:')) {
-    return rawUrl;
+    return appendTokenIfNeeded(rawUrl);
   }
 
   const backendOrigin = getApiBaseUrl().replace(/\/api\/v1\/?$/, '');
-  return `${backendOrigin}/${rawUrl.replace(/^\/+/, '')}`;
+  return appendTokenIfNeeded(`${backendOrigin}/${rawUrl.replace(/^\/+/, '')}`);
 };
 
 const getHeaders = (isJson = true) => {
@@ -157,6 +223,22 @@ async function request(endpoint, options = {}) {
     if (response.status === 204) return true;
     return await response.json();
   } catch (error) {
+    const stored = localStorage.getItem('venus_api_url');
+    // Si localhost falló por error de red y no hay URL manual guardada, probar automáticamente fallback a la API del dominio
+    if (!stored && activeAutoUrl === LOCAL_BASE_URL && (error.message?.includes('Failed to fetch') || error.name === 'TypeError' || error.message?.includes('NetworkError'))) {
+      activeAutoUrl = DOMAIN_BASE_URL;
+      const fallbackUrl = `${DOMAIN_BASE_URL}${cleanEndpoint}`;
+      try {
+        const fallbackRes = await fetch(fallbackUrl, finalOptions);
+        if (fallbackRes.ok) {
+          if (fallbackRes.status === 204) return true;
+          return await fallbackRes.json();
+        }
+      } catch (fallbackErr) {
+        // Fallback también falló
+      }
+    }
+
     if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
       const connMsg = `No se pudo establecer conexión con el servidor backend en '${url}'.\n\nPor favor verifica:\n1. Que la API del backend esté en ejecución.\n2. Que la dirección IP y puerto estén configurados correctamente.`;
       if (onErrorListener) {
@@ -204,17 +286,24 @@ export const api = {
   updateAdminUserPermissions: (username, perms) => request(`/admin/users/${username}/permissions`, { method: 'PUT', body: JSON.stringify(perms) }),
   patchAdminUserDataVisibility: (username, data) => request(`/admin/users/${username}/data-visibility`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  // 2. Autenticación Real (/auth)
-  login: async (username, password) => {
+  // 1. Autenticación (/auth)
+  login: async (username, password, otpCode = null) => {
     const formData = new URLSearchParams();
     formData.append('username', username);
     formData.append('password', password);
-    
+    if (otpCode) {
+      formData.append('otp_code', otpCode);
+    }
+
     const res = await request('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString()
     });
+
+    if (res && res.requires_otp) {
+      return res;
+    }
 
     if (res && res.access_token) {
       setToken(res.access_token);
@@ -226,15 +315,71 @@ export const api = {
 
   getMe: () => request('/auth/me'),
 
-  // Health check real del backend
+  // Autenticación de Dos Factores (2FA)
+  setup2FA: () => request('/auth/2fa/setup', { method: 'POST' }),
+  enable2FA: (otpCode) => request('/auth/2fa/enable', { method: 'POST', body: JSON.stringify({ otp_code: otpCode }) }),
+  disable2FA: (password = null, otpCode = null) => request('/auth/2fa/disable', { method: 'POST', body: JSON.stringify({ password, otp_code: otpCode }) }),
+  get2FAStatus: () => request('/auth/2fa/status'),
+
+  // Health check real del backend con auto-descubrimiento (IP Local de Windows primero -> Dominio Nube fallback)
   healthCheck: async () => {
-    try {
-      const baseUrl = getApiBaseUrl().replace(/\/api\/v1\/?$/, '');
-      const response = await fetch(`${baseUrl}/health`, { method: 'GET' });
-      return response.ok;
-    } catch {
-      return false;
+    const stored = localStorage.getItem('venus_api_url');
+    if (stored) {
+      try {
+        const baseUrl = formatApiUrl(stored).replace(/\/api\/v1\/?$/, '');
+        const response = await fetch(`${baseUrl}/health`, { method: 'GET' });
+        return response.ok;
+      } catch {
+        return false;
+      }
     }
+
+    // 1. Candidatos de API Local (IP del celular, IP de Windows inyectada por comando, 127.0.0.1)
+    const localCandidates = [];
+    if (RUNTIME_HOST) {
+      localCandidates.push(`http://${RUNTIME_HOST}:8000/api/v1`);
+    }
+    if (WINDOWS_LOCAL_IP) {
+      localCandidates.push(`http://${WINDOWS_LOCAL_IP}:8000/api/v1`);
+    }
+    localCandidates.push('http://127.0.0.1:8000/api/v1');
+    localCandidates.push('http://localhost:8000/api/v1');
+
+    // Eliminar duplicados y nulos
+    const uniqueLocalCandidates = Array.from(new Set(localCandidates.filter(Boolean)));
+
+    for (const candidateUrl of uniqueLocalCandidates) {
+      try {
+        const localBase = candidateUrl.replace(/\/api\/v1\/?$/, '');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const res = await fetch(`${localBase}/health`, { method: 'GET', signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          activeAutoUrl = candidateUrl;
+          return true;
+        }
+      } catch {
+        // Candidato local no respondió, probar el siguiente
+      }
+    }
+
+    // 2. Fallback a la API en la Nube (api.venusmuebles.com)
+    try {
+      const domainBase = DOMAIN_BASE_URL.replace(/\/api\/v1\/?$/, '');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const res = await fetch(`${domainBase}/health`, { method: 'GET', signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        activeAutoUrl = DOMAIN_BASE_URL;
+        return true;
+      }
+    } catch {
+      // API en la nube no respondió
+    }
+
+    return false;
   },
 
   // 3. Pull Masivo Inicial de Estado
@@ -359,6 +504,52 @@ export const api = {
   deleteFactura: (id) => request(`/facturas/${id}`, { method: 'DELETE' }),
   dispatchFactura: (id) => request(`/facturas/${id}/dispatch`, { method: 'POST' }),
 
+  /**
+   * Descarga la factura en PDF desde el backend y dispara la descarga en el navegador.
+   * El backend genera el PDF server-side con todos los datos de empresa.
+   */
+  downloadFacturaPdf: async (facturaId) => {
+    const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+    const url = `${baseUrl}/facturas/${facturaId}/download/pdf`;
+    const response = await fetch(url, { headers: getHeaders(false) });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.detail || `Error ${response.status} al generar PDF`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `Factura_${facturaId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  },
+
+  /**
+   * Descarga la factura en PNG desde el backend y dispara la descarga en el navegador.
+   */
+  downloadFacturaPng: async (facturaId) => {
+    const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+    const url = `${baseUrl}/facturas/${facturaId}/download/png`;
+    const response = await fetch(url, { headers: getHeaders(false) });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.detail || `Error ${response.status} al generar PNG`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `Factura_${facturaId}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  },
+
+
   // 7. Ítems / Producción (/items)
   getItems: async (params = {}) => {
     const query = new URLSearchParams(params).toString();
@@ -396,10 +587,17 @@ export const api = {
   // 11. Configuración (/config)
   getConfig: () => request('/config'),
   updateConfig: (configPayload) => request('/config', { method: 'PUT', body: JSON.stringify(configPayload) }),
+  getEmpresaConfig: () => request('/config/empresa'),
+  updateEmpresaConfig: (empresaData) => request('/config/empresa', { method: 'PUT', body: JSON.stringify(empresaData) }),
 
   // 12. Sincronización Desktop & Imágenes (/sync)
   syncPush: (payload) => request('/sync/push', { method: 'POST', body: JSON.stringify(payload) }),
   syncPull: (lastSync) => request(`/sync/pull${lastSync ? `?last_sync=${lastSync}` : ''}`),
+  uploadImage: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/images/upload', { method: 'POST', body: formData });
+  },
   uploadSyncImage: (localImageId, file) => {
     const formData = new FormData();
     formData.append('local_image_id', localImageId);
@@ -433,3 +631,5 @@ export const api = {
 
   getMetricasFinancieras: (start, end) => request(`/finanzas/metricas?start_date=${start}&end_date=${end}`)
 };
+
+export default api;

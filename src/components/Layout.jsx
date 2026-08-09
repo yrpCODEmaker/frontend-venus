@@ -26,13 +26,8 @@ function Layout({ children }) {
 
   return (
     <div className="layout-container">
-      {/* Header Móvil con Botón Hamburguesa de 3 Rayitas */}
+      {/* Header Móvil con Botón Hamburguesa del lado Izquierdo */}
       <div className="mobile-header glass-panel">
-        <div className="mobile-brand">
-          <div className="logo-glow"></div>
-          <h2>Venus</h2>
-        </div>
-
         <button 
           className="hamburger-btn" 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -40,6 +35,11 @@ function Layout({ children }) {
         >
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
+
+        <div className="mobile-brand">
+          <img src="/venus_muebles_avatar.jpg" alt="Venus Logo" className="app-logo-avatar" />
+          <h2>Venus</h2>
+        </div>
       </div>
 
       {/* Overlay oscuro cuando el menú móvil está abierto */}
@@ -53,7 +53,7 @@ function Layout({ children }) {
       {/* Sidebar de Navegación (Fijo en Escritorio / Desplegable Drawer en Móvil) */}
       <nav className={`glass-panel sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
-          <div className="logo-glow"></div>
+          <img src="/venus_muebles_avatar.jpg" alt="Venus Logo" className="app-logo-avatar" />
           <h2>Venus</h2>
           <button className="mobile-close-btn" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={20} />
@@ -120,17 +120,39 @@ function Layout({ children }) {
         {children}
       </main>
 
-      {/* Botón Flotante Azul del Carrito (Navega automáticamente a Facturar / POS) */}
-      <button 
-        className="floating-cart-btn" 
-        onClick={() => navigate('/invoices')}
-        title="Ir a Facturar"
-      >
-        <ShoppingCart size={22} />
-        {totalItemsCount > 0 && (
-          <span className="floating-cart-badge">{totalItemsCount}</span>
-        )}
-      </button>
+      {/* Botón Flotante Dinámico (3 Estados: Catálogo → Stock → POS → Catálogo) */}
+      {(location.pathname.startsWith('/catalog') || location.pathname.startsWith('/stock') || location.pathname.startsWith('/invoices')) && (() => {
+        let icon = <ShoppingCart size={22} />;
+        let title = "Ir a Facturar / POS";
+        let targetPath = "/invoices";
+
+        if (location.pathname.startsWith('/catalog')) {
+          icon = <Warehouse size={22} />;
+          title = "Ir a Stock";
+          targetPath = "/stock";
+        } else if (location.pathname.startsWith('/stock')) {
+          icon = <ShoppingCart size={22} />;
+          title = "Ir a Facturar / POS";
+          targetPath = "/invoices";
+        } else if (location.pathname.startsWith('/invoices')) {
+          icon = <PackageSearch size={22} />;
+          title = "Ir a Catálogo";
+          targetPath = "/catalog";
+        }
+
+        return (
+          <button 
+            className="floating-cart-btn" 
+            onClick={() => navigate(targetPath)}
+            title={title}
+          >
+            {icon}
+            {totalItemsCount > 0 && (
+              <span className="floating-cart-badge">{totalItemsCount}</span>
+            )}
+          </button>
+        );
+      })()}
     </div>
   );
 }

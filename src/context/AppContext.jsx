@@ -143,8 +143,32 @@ export const AppProvider = ({ children }) => {
     });
   };
 
-  // Carrito POS / Nueva Factura
-  const [cart, setCart] = useState([]);
+  // Carrito POS / Nueva Factura con Persistencia en localStorage
+  const CART_STORAGE_KEY = 'venus_pos_cart';
+
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Error cargando carrito de localStorage:", e);
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      // Filtrar instancias de File antes de serializar (guardar previews como Data URIs/URLs)
+      const cleanCart = cart.map(item => {
+        const { image_file, imagenes_apoyo_files, ...rest } = item;
+        return rest;
+      });
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cleanCart));
+    } catch (e) {
+      console.error("Error guardando carrito en localStorage:", e);
+    }
+  }, [cart]);
+
   const [selectedCliente, setSelectedCliente] = useState(null);
 
   // Estados de interfaz
@@ -234,18 +258,22 @@ export const AppProvider = ({ children }) => {
     }
   }, []);
 
-  // Login de Usuario Estricto
-  const loginUser = async (username, password) => {
+  // Login de Usuario Estricto (con soporte 2FA / OTP)
+  const loginUser = async (username, password, otpCode = null) => {
     setLoading(true);
     try {
-      const res = await api.login(username, password);
+      const res = await api.login(username, password, otpCode);
+      if (res && res.requires_otp) {
+        showNotification('Se requiere un código de autenticación (OTP) de 6 dígitos.', 'info');
+        return { requiresOtp: true, message: res.message };
+      }
       if (res && res.access_token) {
         saveTokenStorage(res.access_token);
         setTokenState(res.access_token);
         // Cargar perfil completo (incluyendo permisos)
         await loadUserProfile();
         showNotification('¡Sesión iniciada correctamente!', 'success');
-        return true;
+        return { success: true };
       }
       throw new Error('Respuesta de autenticación vacía');
     } catch (err) {
@@ -253,7 +281,9 @@ export const AppProvider = ({ children }) => {
       setTokenState(null);
       setUser(null);
       setPermissions(DEFAULT_PERMISSIONS);
-      return false;
+      const msg = err.detail || err.message || 'Error al iniciar sesión';
+      showNotification(msg, 'error');
+      return { success: false, error: msg };
     } finally {
       setLoading(false);
     }
@@ -285,14 +315,19 @@ export const AppProvider = ({ children }) => {
   const addToCart = (productItem, isStock = false) => {
     setCart(prev => {
       return [...prev, {
+        ...productItem,
         id: Date.now() + Math.random(),
         catalogo_id: productItem.catalogo_id || productItem.id,
         nombre: productItem.nombre,
-        color: productItem.color || 'Por definir',
-        material: productItem.material || 'Por definir',
+        color: productItem.color !== undefined ? productItem.color : (productItem.tela !== undefined ? productItem.tela : null),
+        material: productItem.material !== undefined ? productItem.material : null,
+        tela: productItem.tela !== undefined ? productItem.tela : null,
         descripcion: productItem.descripcion || '',
         image_preview: productItem.image_preview || productItem.image_url || '',
         image_file: productItem.image_file || null,
+        imagenes_apoyo_files: productItem.imagenes_apoyo_files || [],
+        imagenes_apoyo_previews: productItem.imagenes_apoyo_previews || [],
+        imagenes_apoyo: productItem.imagenes_apoyo || [],
         precio: productItem.precio_base || productItem.precio || 0,
         cantidad: productItem.cantidad || 1,
         isStock,

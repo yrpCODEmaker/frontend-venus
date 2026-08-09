@@ -27,8 +27,8 @@ export const formatCurrencyInput = (value) => {
   const parts = cleanStr.split('.');
   // Formatear la parte entera con comas
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  
-  // Reunir las partes, asegurándose de no tener más de dos decimales opcionalmente
+
+  // Reunir las partes
   if (parts.length > 1) {
     return `${parts[0]}.${parts[1].substring(0, 2)}`;
   }
@@ -63,49 +63,103 @@ export const formatPhoneInput = (value) => {
 
 /**
  * Parsea un string que puede ser JSON o texto plano.
- * Útil para campos como color o material que ahora se guardan como JSON
- * pero antes se guardaban como texto plano.
  * @param {string} value - El valor a parsear
  * @returns {object|string} - El objeto parseado o el texto plano
  */
 export const parseItemJSON = (value) => {
   if (!value) return null;
+  if (typeof value !== 'string') return value;
   try {
-    const parsed = JSON.parse(value);
-    return parsed;
+    return JSON.parse(value);
   } catch (e) {
     return value;
   }
 };
 
 /**
- * Formatea visualmente un JSON (arreglo u objeto) o texto plano.
- * @param {string} value - El valor desde la DB
- * @returns {string} - Un string bonito para mostrar
+ * Limpia y normaliza cualquier valor de campo eliminando nulos, marcas "None", "(None)",
+ * "Por definir", arreglos JSON escapados como '["Tapicería"]', corchetes y comillas.
+ * Retorna un string limpio o "" si el campo no tiene datos reales.
  */
-export const formatItemJSON = (value) => {
-  const parsed = parseItemJSON(value);
-  
-  if (!parsed) {
+export const cleanFieldValue = (value) => {
+  if (value === null || value === undefined) return '';
+
+  let str = '';
+  if (typeof value === 'object') {
+    if (Array.isArray(value)) {
+      str = value
+        .map(v => cleanFieldValue(v))
+        .filter(Boolean)
+        .join(', ');
+    } else {
+      str = Object.entries(value)
+        .map(([k, v]) => {
+          const valClean = cleanFieldValue(v);
+          return valClean ? `${k}: ${valClean}` : null;
+        })
+        .filter(Boolean)
+        .join(' | ');
+    }
+  } else {
+    str = String(value).trim();
+  }
+
+  if (!str) return '';
+
+  // Si es un string JSON que representa un array como '["Tapicería"]'
+  if (str.startsWith('[') && str.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(str);
+      if (Array.isArray(parsed)) {
+        str = parsed.map(v => cleanFieldValue(v)).filter(Boolean).join(', ');
+      }
+    } catch {}
+  }
+
+  // Quitar corchetes, comillas externas o barras invertidas sobrantes
+  str = str.replace(/^\[\s*["']?|["']?\s*\]$/g, '').replace(/\\"/g, '"').replace(/^["']+|["']+$/g, '').trim();
+
+  // Limpiar valores nulos o placeholders comunes
+  const lower = str.toLowerCase();
+  if (['none', 'null', 'undefined', '(none)', '(null)', 'por definir', 'ninguno', 'ninguna', 'n/a'].includes(lower)) {
     return '';
   }
 
-  if (Array.isArray(parsed)) {
-    return parsed
-      .filter(val => val && !String(val).startsWith('Ninguna') && !String(val).startsWith('None'))
-      .join(' - ');
-  }
-  
-  if (typeof parsed === 'object') {
-    if (Object.keys(parsed).length === 0) return 'Dato Inválido';
-    return Object.entries(parsed)
-      .filter(([_, val]) => val && !String(val).startsWith('Ninguna') && !String(val).startsWith('None'))
-      .map(([key, val]) => {
-        const displayKey = key.charAt(0).toUpperCase() + key.slice(1);
-        return `${displayKey}: ${val}`;
-      })
-      .join(' | ');
-  }
+  // Quitar cualquier sufijo tipo "(None)" o "(null)" o "(Por definir)" pegado al final
+  str = str.replace(/\s*\((none|null|undefined|por definir|ninguna|ninguno|n\/a)\)/gi, '').trim();
 
-  return String(parsed);
+  return str;
+};
+
+/**
+ * Formatea el campo Área limpiamente (ej. "Tapicería" en lugar de '["Tapicería"]').
+ */
+export const formatArea = (area) => {
+  return cleanFieldValue(area);
+};
+
+/**
+ * Formatea Material y Tela combinados de forma limpia e inteligente.
+ */
+export const formatMaterialAndTela = (material, tela) => {
+  const cleanMat = cleanFieldValue(material);
+  const cleanTel = cleanFieldValue(tela);
+
+  if (cleanMat && cleanTel && cleanMat.toLowerCase() !== cleanTel.toLowerCase()) {
+    return `Material: ${cleanMat} · Tela: ${cleanTel}`;
+  }
+  if (cleanMat) {
+    return `Material: ${cleanMat}`;
+  }
+  if (cleanTel) {
+    return `Tela: ${cleanTel}`;
+  }
+  return '';
+};
+
+/**
+ * Formatea visualmente un JSON o texto plano limpiando valores nulos.
+ */
+export const formatItemJSON = (value) => {
+  return cleanFieldValue(value);
 };

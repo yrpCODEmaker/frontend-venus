@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Server, Palette, Building2, Plus, Trash2, Save, ShieldCheck, Users } from 'lucide-react';
+import { Server, Palette, Building2, Plus, Trash2, Save, ShieldCheck, Users, KeyRound } from 'lucide-react';
 import { formatPhoneInput } from '../utils/formatters';
+import api from '../services/api';
 import UserManagementPanel from '../components/config/UserManagementPanel';
 import MaterialesTableManager from '../components/config/MaterialesTableManager';
+import TwoFactorConfigPanel from '../components/config/TwoFactorConfigPanel';
 import './Config.css';
 
 function Config() {
   const { config, updateConfigValue, apiUrl, updateApiUrl, showNotification, isAdmin } = useApp();
-  const [activeTab, setActiveTab] = useState(isAdmin ? 'users' : 'server');
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'users' : '2fa');
 
   // Red/Server
   const [tempApiUrl, setTempApiUrl] = useState(apiUrl);
@@ -19,29 +21,49 @@ function Config() {
   const [newMaterial, setNewMaterial] = useState('');
   const [newColor, setNewColor] = useState('');
 
-  // Empresa
-  const [empresaNombre, setEmpresaNombre] = useState(config.company_info?.nombre_empresa || 'Muebles Venus SRL');
-  const [empresaRnc, setEmpresaRnc] = useState(config.company_info?.rnc || '131-99882-1');
-  const [empresaTel, setEmpresaTel] = useState(config.company_info?.telefono || '809-555-8888');
-  const [empresaDir, setEmpresaDir] = useState(config.company_info?.direccion || 'Santo Domingo, República Dominicana');
+  // Empresa (Persistido en company_config.json en el backend)
+  const [empresaNombre, setEmpresaNombre] = useState('Venus Muebles');
+  const [empresaRnc, setEmpresaRnc] = useState('');
+  const [empresaTel, setEmpresaTel] = useState('');
+  const [empresaDir, setEmpresaDir] = useState('');
+
+  useEffect(() => {
+    const fetchEmpresaConfig = async () => {
+      try {
+        const emp = await api.getEmpresaConfig();
+        if (emp) {
+          if (emp.nombre) setEmpresaNombre(emp.nombre);
+          if (emp.rnc !== undefined) setEmpresaRnc(emp.rnc || '');
+          if (emp.telefono) setEmpresaTel(emp.telefono);
+          if (emp.ubicacion) setEmpresaDir(emp.ubicacion);
+        }
+      } catch (err) {
+        console.error("Error cargando configuración de empresa desde backend:", err);
+      }
+    };
+    fetchEmpresaConfig();
+  }, []);
 
   const handleSaveApiServer = (e) => {
     e.preventDefault();
     updateApiUrl(tempApiUrl);
   };
 
-  const handleSaveEmpresa = (e) => {
+  const handleSaveEmpresa = async (e) => {
     e.preventDefault();
-    const updatedConfig = {
-      ...config,
-      company_info: {
-        nombre_empresa: empresaNombre,
+    try {
+      const res = await api.updateEmpresaConfig({
+        nombre: empresaNombre,
         rnc: empresaRnc,
         telefono: empresaTel,
-        direccion: empresaDir
+        ubicacion: empresaDir
+      });
+      if (res) {
+        showNotification('Datos de la empresa guardados correctamente en company_config.json', 'success');
       }
-    };
-    updateConfigValue(updatedConfig);
+    } catch (err) {
+      showNotification(`Error al guardar datos de la empresa: ${err.message}`, 'error');
+    }
   };
 
   const addItemToConfig = (key, value, setter) => {
@@ -73,7 +95,7 @@ function Config() {
       <header className="page-header glass-panel">
         <div>
           <h1>Configuración del Sistema</h1>
-          <p>Gestión de conexión al backend, catálogos auxiliares y datos fiscales</p>
+          <p>Gestión de seguridad, conexión al backend, catálogos auxiliares y datos fiscales</p>
         </div>
       </header>
 
@@ -86,6 +108,12 @@ function Config() {
             <Users size={18} /> Empleados y Permisos
           </button>
         )}
+        <button 
+          className={`tab-button ${activeTab === '2fa' ? 'active' : ''}`}
+          onClick={() => setActiveTab('2fa')}
+        >
+          <KeyRound size={18} /> Seguridad & 2FA
+        </button>
         <button 
           className={`tab-button ${activeTab === 'server' ? 'active' : ''}`}
           onClick={() => setActiveTab('server')}
@@ -111,7 +139,12 @@ function Config() {
         <UserManagementPanel />
       )}
 
-      {/* PESTAÑA 1: RED Y SERVIDOR */}
+      {/* PESTAÑA 1: SEGURIDAD Y 2FA */}
+      {activeTab === '2fa' && (
+        <TwoFactorConfigPanel />
+      )}
+
+      {/* PESTAÑA 2: RED Y SERVIDOR */}
       {activeTab === 'server' && (
         <div className="config-section glass-panel animate-fade-in">
           <h2>Conexión al Backend REST API</h2>

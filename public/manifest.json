@@ -1,0 +1,17 @@
+{
+  "short_name": "Venus",
+  "name": "Venus Muebles App",
+  "icons": [
+    {
+      "src": "/venus_muebles_avatar.jpg",
+      "type": "image/jpeg",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a"
+}

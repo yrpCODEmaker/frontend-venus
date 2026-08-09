@@ -6,7 +6,16 @@
 
 @media (max-width: 992px) {
   .pos-container {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pos-checkout-panel {
+    order: 1; /* Detalles del Cliente y Pago ARRIBA en versión móvil */
+  }
+
+  .pos-cart-panel {
+    order: 2; /* Productos en factura ABAJO en versión móvil */
   }
 }
 
@@ -33,52 +42,124 @@
   gap: 0.8rem;
 }
 
-.cart-item-row {
+/* Rediseño de tarjeta de producto en carrito */
+.cart-item-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.1rem;
   background: var(--color-surface-2);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
 }
 
-.cart-item-info h4 {
-  font-size: 1rem;
+.cart-item-top {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.cart-item-thumb {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-1);
+}
+
+.cart-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cart-item-main-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.cart-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cart-item-title {
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--color-text-dark);
+  margin: 0;
 }
 
-.cart-item-info p {
+.btn-remove-cart {
+  color: var(--color-accent-red);
+  padding: 0.35rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-remove-cart:hover {
+  background: rgba(231, 76, 60, 0.15);
+  color: #ff5252;
+}
+
+.cart-item-specs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+}
+
+.cart-spec-badge {
   font-size: 0.8rem;
+  font-weight: 500;
   color: var(--color-text-light);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
 }
 
-.cart-item-price {
-  font-size: 0.85rem;
-  color: var(--color-primary);
+.cart-item-desc-text {
+  font-size: 0.82rem;
+  color: var(--color-text-light);
+  margin: 0.2rem 0 0 0;
+  line-height: 1.35;
+}
+
+.cart-item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.65rem;
+  border-top: 1px dashed var(--color-border);
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.cart-item-unit-price {
+  font-size: 0.88rem;
   font-weight: 600;
+  color: var(--color-primary);
 }
 
-.cart-item-actions {
+.cart-item-footer-controls {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.item-subtotal {
-  font-weight: 700;
-  font-size: 1rem;
+.item-subtotal-val {
+  font-weight: 800;
+  font-size: 1.1rem;
   color: var(--color-text-dark);
-}
-
-.btn-remove {
-  color: var(--color-accent-red);
-  padding: 0.4rem;
-  transition: color var(--transition-fast);
-}
-
-.btn-remove:hover {
-  color: #ff7b72;
 }
 
 .btn-clear-cart {
@@ -389,4 +470,82 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+/* ── Botones de descarga de factura ── */
+.btn-download-invoice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  border: none;
+}
+
+.btn-download-invoice:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-download-invoice:not(:disabled):hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.btn-download-pdf {
+  background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+  color: #ffffff;
+}
+
+.btn-download-png {
+  background: linear-gradient(135deg, #2c3e90 0%, #4e6ef2 100%);
+  color: #ffffff;
+}
+.spin-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+/* Estilos Pago Parcial */
+.payment-notice-full {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  background: rgba(39, 174, 96, 0.1);
+  border: 1px solid rgba(39, 174, 96, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-dark);
+}
+
+.partial-payment-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding-top: 0.5rem;
+}
+
+.badge-pago-parcial {
+  background: rgba(243, 156, 18, 0.15);
+  color: var(--color-accent-amber);
+  border: 1px solid var(--color-accent-amber);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.badge-pago-completo {
+  background: rgba(39, 174, 96, 0.15);
+  color: var(--color-accent-green);
+  border: 1px solid var(--color-accent-green);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
 }

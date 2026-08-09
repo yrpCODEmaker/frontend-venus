@@ -139,6 +139,11 @@ input, select, textarea {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .animate-fade-in {
   animation: fadeIn var(--transition-normal) forwards;
 }
@@ -160,4 +165,37 @@ input, select, textarea {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted); 
+}
+
+/* Header de Módulo (Catálogo, Stock, etc.) */
+.module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.module-header h1 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--color-text-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.module-header-icon {
+  color: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+  .module-header {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .module-header h1 {
+    font-size: 1.15rem;
+  }
 }
