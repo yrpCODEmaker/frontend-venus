@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="/opt/venus-frontend"
-REPO_URL="${REPO_URL:-https://github.com/tu-usuario/tu-repo.git}"
+REPO_URL=https://github.com/yrpCODEmaker/frontend-venus.git
 BRANCH="${BRANCH:-main}"
 IMAGE_NAME="venus-frontend"
 CONTAINER_NAME="venus-frontend"
