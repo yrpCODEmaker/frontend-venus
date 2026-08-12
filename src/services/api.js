@@ -101,6 +101,21 @@ export const setForbiddenListener = (listener) => {
   onForbiddenListener = listener;
 };
 
+export const parseAreaField = (areaVal) => {
+  if (Array.isArray(areaVal)) return areaVal;
+  if (typeof areaVal === 'string') {
+    if (!areaVal.trim()) return [];
+    try {
+      const parsed = JSON.parse(areaVal);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // Ignorar error y usar fallback
+    }
+    return areaVal.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 /**
  * Construye la URL de imagen para un item usando el endpoint protegido.
  *
@@ -396,16 +411,19 @@ export const api = {
 
     const catalogo = (Array.isArray(catalogoRaw) ? catalogoRaw : []).map(item => ({
       ...item,
+      area: parseAreaField(item.area),
       image_url: extractImageUrl(item)
     }));
 
     const stock = (Array.isArray(stockRaw) ? stockRaw : []).map(item => ({
       ...item,
+      area: parseAreaField(item.area),
       image_url: extractImageUrl(item)
     }));
 
     const items = (Array.isArray(itemsRaw) ? itemsRaw : []).map(item => ({
       ...item,
+      area: parseAreaField(item.area),
       image_url: extractImageUrl(item)
     }));
 
@@ -425,6 +443,7 @@ export const api = {
     const list = await request('/catalogo');
     return (Array.isArray(list) ? list : []).map(item => ({
       ...item,
+      area: parseAreaField(item.area),
       image_url: extractImageUrl(item)
     }));
   },
@@ -441,6 +460,7 @@ export const api = {
     const created = await request('/catalogo', { method: 'POST', body: formData });
     return {
       ...created,
+      area: parseAreaField(created.area),
       image_url: extractImageUrl(created)
     };
   },
@@ -461,6 +481,7 @@ export const api = {
     const updated = await request(`/catalogo/${id}`, { method: 'PUT', body: formData });
     return {
       ...updated,
+      area: parseAreaField(updated.area),
       image_url: extractImageUrl(updated)
     };
   },
@@ -472,6 +493,7 @@ export const api = {
     const list = await request('/stock');
     return (Array.isArray(list) ? list : []).map(item => ({
       ...item,
+      area: parseAreaField(item.area),
       image_url: extractImageUrl(item)
     }));
   },
@@ -487,6 +509,7 @@ export const api = {
     const created = await request('/stock', { method: 'POST', body: formData });
     return {
       ...created,
+      area: parseAreaField(created.area),
       image_url: extractImageUrl(created)
     };
   },

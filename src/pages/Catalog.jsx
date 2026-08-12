@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
-import { Plus, Search, Filter, ShoppingCart, Image as ImageIcon, X, Trash2, SlidersHorizontal, Pencil, PackageSearch } from 'lucide-react';
+import { Plus, Search, Filter, ShoppingCart, Image as ImageIcon, X, Trash2, SlidersHorizontal, Pencil, PackageSearch, LayoutGrid, Grid2x2, Grid3x3 } from 'lucide-react';
 import ProtectedImage from '../components/ProtectedImage';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/formatters';
 import './Catalog.css';
@@ -12,6 +12,17 @@ function Catalog() {
   const [selectedArea, setSelectedArea] = useState('Todos');
   const [selectedTipo, setSelectedTipo] = useState('Todos');
   const [failedImages, setFailedImages] = useState({});
+
+  // Densidad de grid: 3 columnas (default), 4 ó 5. Se guarda en localStorage.
+  const [gridCols, setGridCols] = useState(() => {
+    const saved = localStorage.getItem('venus_catalog_grid_cols');
+    const n = parseInt(saved, 10);
+    return n >= 3 && n <= 5 ? n : 3;
+  });
+  const setGrid = (cols) => {
+    setGridCols(cols);
+    localStorage.setItem('venus_catalog_grid_cols', String(cols));
+  };
 
   // Modal Nuevo Modelo al Catálogo
   const [showModal, setShowModal] = useState(false);
@@ -262,6 +273,32 @@ function Catalog() {
           <select value={selectedTipo} onChange={e => setSelectedTipo(e.target.value)}>
             {tiposList.map(t => <option key={t} value={t}>Tipo: {t}</option>)}
           </select>
+
+          {/* Botones de densidad de grid */}
+          <div className="grid-density-toggle">
+            <button
+              className={`grid-density-btn${gridCols === 3 ? ' active' : ''}`}
+              onClick={() => setGrid(3)}
+              title="3 por fila (vista grande)"
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              className={`grid-density-btn${gridCols === 4 ? ' active' : ''}`}
+              onClick={() => setGrid(4)}
+              title="4 por fila"
+            >
+              <Grid2x2 size={16} />
+            </button>
+            <button
+              className={`grid-density-btn${gridCols === 5 ? ' active' : ''}`}
+              onClick={() => setGrid(5)}
+              title="5 por fila (vista compacta)"
+            >
+              <Grid3x3 size={16} />
+            </button>
+          </div>
+
           <button 
             className="btn-action-primary" 
             onClick={handleOpenNewModelModal}
@@ -274,32 +311,16 @@ function Catalog() {
       </div>
 
       {/* Grid de Productos */}
-      <div className="catalog-grid">
+      <div className="catalog-grid" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
         {filteredCatalogo.map(item => {
           const hasImage = item.image_url && !failedImages[item.id];
           const itemAreasList = Array.isArray(item.area) && item.area.length > 0 ? item.area : ['General'];
           // Calcular ancho de columna imagen: alto_tarjeta(200px) × ratio_aspecto
           // El contenedor se ajusta a la imagen real → sin recorte, sin barras
-          const CARD_HEIGHT = 200;
-          const parseRatio = (ar) => {
-            if (!ar) return null;
-            if (typeof ar === 'number') return ar;
-            if (typeof ar === 'string' && ar.includes(':')) {
-              const [w, h] = ar.split(':').map(Number);
-              return (w && h) ? w / h : null;
-            }
-            const n = parseFloat(ar);
-            return isNaN(n) ? null : n;
-          };
-          const ratio = parseRatio(item.aspect_ratio);
-          // Sin ratio conocido → fallback 47% (como antes)
-          const imgColStyle = ratio
-            ? { flex: `0 0 ${Math.round(CARD_HEIGHT * ratio)}px`, width: `${Math.round(CARD_HEIGHT * ratio)}px` }
-            : { flex: '0 0 47%' };
           return (
             <div key={item.id} className="catalog-card glass-panel">
-              {/* Columna Imagen — ancho calculado por aspect_ratio real */}
-              <div className="card-image-col" style={imgColStyle}>
+              {/* Columna Imagen — 42% del ancho del card, escala proporcional */}
+              <div className="card-image-col">
                 {hasImage ? (
                   <ProtectedImage 
                     src={item.image_url} 

@@ -49,7 +49,7 @@ function Invoices() {
   };
 
   // Facturación Rápida (Casilla y 3 campos)
-  const [isFastBilling, setIsFastBilling] = useState(false);
+  const [isFastBilling, setIsFastBilling] = useState(true);
   const [fastNombre, setFastNombre] = useState('');
   const [fastApellido, setFastApellido] = useState('');
   const [fastTelefono, setFastTelefono] = useState('');
@@ -93,6 +93,25 @@ function Invoices() {
   };
 
   const fullSelectedFactura = getFullFactura(selectedFactura);
+
+  const getGroupedItems = (itemsList) => {
+    if (!itemsList || itemsList.length === 0) return [];
+    const grouped = [];
+    itemsList.forEach(it => {
+      const key = `${it.nombre}_${it.catalogo_id || ''}_${it.color || ''}_${it.tela || ''}_${it.material || ''}_${it.area || ''}_${it.tipo_mueble || ''}_${it.precio || ''}`;
+      const existing = grouped.find(g => g.key === key);
+      if (existing) {
+        existing.cantidad += (parseInt(it.cantidad) || 1);
+        existing.subtotal += (parseFloat(it.subtotal) || 0);
+        existing.ids.push(it.id);
+      } else {
+        grouped.push({ ...it, key, cantidad: parseInt(it.cantidad) || 1, subtotal: parseFloat(it.subtotal) || 0, ids: [it.id] });
+      }
+    });
+    return grouped;
+  };
+
+  const groupedSelectedItems = fullSelectedFactura ? getGroupedItems(fullSelectedFactura.items) : [];
 
   const selectedClientObj = (clientes || []).find(c => String(c.id) === String(selectedClienteId));
 
@@ -173,7 +192,7 @@ function Invoices() {
     };
 
     // Formatear ítems procesando imágenes principales y de apoyo si fueron adjuntadas
-    const formattedItems = await Promise.all(cart.map(async (item) => {
+    const itemsArrays = await Promise.all(cart.map(async (item) => {
       let mainImageId = item.image_id || null;
       let mainFileToUpload = item.image_file;
       if (!mainFileToUpload && item.image_preview && typeof item.image_preview === 'string' && item.image_preview.startsWith('data:')) {
@@ -227,8 +246,8 @@ function Invoices() {
 
       const rawCatId = item.catalogo_id || (!item.isStock ? item.id : null);
       const cleanCatId = (rawCatId && !String(rawCatId).startsWith('cart_')) ? String(rawCatId) : null;
-      const rawStockId = item.isStock ? item.id : item.stock_id;
-      const cleanStockId = (rawStockId && !String(rawStockId).startsWith('cart_')) ? String(rawStockId) : null;
+      const rawStockId = item.stock_id || (item.isStock ? item.id : null);
+      const cleanStockId = (rawStockId && !String(rawStockId).startsWith('cart_') && !String(rawStockId).includes('.')) ? String(rawStockId) : null;
 
       const cleanParam = (val) => {
         if (!val) return null;
@@ -251,29 +270,45 @@ function Invoices() {
         return strVal;
       };
 
-      return {
+      const baseItem = {
         stock_id: cleanStockId,
         catalogo_id: cleanCatId,
         image_id: mainImageId,
         imagenes_apoyo: apoyoImageIds,
         nombre: item.nombre || 'Producto',
-        cantidad: parseInt(item.cantidad) || 1,
         tipo: item.isStock ? 'stock' : 'encargo',
-        subtotal: parseFloat(item.precio * item.cantidad) || 0,
         tela: cleanParam(item.tela),
         material: cleanParam(item.material),
         descripcion: item.descripcion || '',
         area: Array.isArray(item.area) ? item.area.join(', ') : (item.area || 'Tapicería'),
         tipo_mueble: item.tipo_mueble || item.tipo || 'Mueble'
       };
+
+      const qty = parseInt(item.cantidad) || 1;
+      const unitPrice = parseFloat(item.precio) || 0;
+
+      if (!item.isStock && qty > 1) {
+        return Array.from({ length: qty }).map(() => ({
+          ...baseItem,
+          cantidad: 1,
+          subtotal: unitPrice
+        }));
+      }
+
+      return [{
+        ...baseItem,
+        cantidad: qty,
+        subtotal: parseFloat(item.precio * item.cantidad) || 0
+      }];
     }));
 
+    const formattedItems = itemsArrays.flat();
+
     // Estructura del cliente segun ClienteRapidoSchema del backend:
-    // Siempre {nombre, apellido, telefono} con strings (nunca null)
     const clientPayload = isFastBilling ? {
       nombre: fastNombre.trim(),
-      apellido: fastApellido.trim() || '',
-      telefono: fastTelefono.trim() || ''
+      apellido: fastApellido.trim() || null,
+      telefono: fastTelefono.trim() || null
     } : null;  // Para factura normal, el cliente se identifica por cliente_id
 
     const effectiveMontoPagado = isPartialPayment 
@@ -584,26 +619,24 @@ function Invoices() {
                     />
                   </div>
 
-                  <div className="form-row">
-                    <div className="input-group">
-                      <label>Apellido</label>
-                      <input 
-                        type="text" 
-                        value={fastApellido} 
-                        onChange={e => setFastApellido(e.target.value)} 
-                        placeholder="Ej: Pérez"
-                      />
-                    </div>
+                  <div className="input-group">
+                    <label>Apellido (Opcional)</label>
+                    <input 
+                      type="text" 
+                      value={fastApellido} 
+                      onChange={e => setFastApellido(e.target.value)} 
+                      placeholder="Ej: Pérez"
+                    />
+                  </div>
 
-                    <div className="input-group">
-                      <label>Número Telefónico</label>
-                      <input 
-                        type="text" 
-                        value={fastTelefono} 
-                        onChange={e => setFastTelefono(formatPhoneInput(e.target.value))} 
-                        placeholder="Ej: 809-555-0000"
-                      />
-                    </div>
+                  <div className="input-group">
+                    <label>Número Telefónico (Opcional)</label>
+                    <input 
+                      type="text" 
+                      value={fastTelefono} 
+                      onChange={e => setFastTelefono(formatPhoneInput(e.target.value))} 
+                      placeholder="Ej: 809-555-0000"
+                    />
                   </div>
                 </div>
               )}
@@ -849,9 +882,9 @@ function Invoices() {
               <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
                 <h4 style={{ marginBottom: '0.5rem' }}>Artículos:</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
-                  {fullSelectedFactura.items && fullSelectedFactura.items.length > 0 ? (
-                    fullSelectedFactura.items.map(it => (
-                      <div key={it.id} style={{ display: 'flex', flexDirection: 'column', fontSize: '0.9rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  {groupedSelectedItems && groupedSelectedItems.length > 0 ? (
+                    groupedSelectedItems.map(it => (
+                      <div key={it.ids[0]} style={{ display: 'flex', flexDirection: 'column', fontSize: '0.9rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                         <div 
                           style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer', padding: '0.25rem 0' }}
                           onClick={() => setExpandedItemId(expandedItemId === it.id ? null : it.id)}
@@ -872,8 +905,8 @@ function Invoices() {
                             
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'grid', gridTemplateColumns: '1fr', gap: '0.25rem' }}>
                               <span><strong>Creado:</strong> {it.created_at ? new Date(it.created_at).toLocaleDateString() : 'N/A'}</span>
-                              <span><strong>En Producción:</strong> {it.fecha_procesando ? new Date(it.fecha_procesando).toLocaleDateString() : 'Aún no'}</span>
-                              <span><strong>Terminado:</strong> {it.fecha_procesado ? new Date(it.fecha_procesado).toLocaleDateString() : 'Aún no'}</span>
+                              <span><strong>En Producción:</strong> {it.ids.length > 1 ? 'Varios ítems' : (it.fecha_procesando ? new Date(it.fecha_procesando).toLocaleDateString() : 'Aún no')}</span>
+                              <span><strong>Terminado:</strong> {it.ids.length > 1 ? 'Varios ítems' : (it.fecha_procesado ? new Date(it.fecha_procesado).toLocaleDateString() : 'Aún no')}</span>
                             </div>
                           </div>
                         )}
@@ -903,12 +936,12 @@ function Invoices() {
 
               {!fullSelectedFactura.declarado_perdida && !fullSelectedFactura.declarado_perdonado && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                  {hasPermission('facturas_declarar_perdida') && Math.max(0, (fullSelectedFactura.total || 0) - (fullSelectedFactura.monto_pagado || 0)) > 0 && (
+                  {hasPermission('facturas_modificar') && Math.max(0, (fullSelectedFactura.total || 0) - (fullSelectedFactura.monto_pagado || 0)) > 0 && (
                     <button type="button" className="btn-action-secondary" onClick={handleDeclararPerdida} style={{ color: 'var(--danger-color)', borderColor: 'var(--danger-color)' }}>
                       Declarar Pérdida
                     </button>
                   )}
-                  {hasPermission('facturas_perdonar_deuda') && Math.max(0, (fullSelectedFactura.total || 0) - (fullSelectedFactura.monto_pagado || 0)) > 0 && (
+                  {hasPermission('facturas_modificar') && Math.max(0, (fullSelectedFactura.total || 0) - (fullSelectedFactura.monto_pagado || 0)) > 0 && (
                     <button type="button" className="btn-action-secondary" onClick={handlePerdonarDeuda} style={{ color: '#15803d', borderColor: '#15803d' }}>
                       Perdonar Deuda
                     </button>
@@ -916,7 +949,7 @@ function Invoices() {
                 </div>
               )}
 
-              {!fullSelectedFactura.declarado_perdida && !fullSelectedFactura.declarado_perdonado && (
+              {!fullSelectedFactura.declarado_perdida && !fullSelectedFactura.declarado_perdonado && Math.max(0, (fullSelectedFactura.total || 0) - (fullSelectedFactura.monto_pagado || 0)) > 0 && (
                 <form onSubmit={handleAddAbono} className="abono-form" style={{ marginTop: '1rem' }}>
                   <h4>Registrar Nuevo Abono</h4>
                   <div className="input-group">

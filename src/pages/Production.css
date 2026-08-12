@@ -113,6 +113,7 @@
   display: flex;
   gap: 1.5rem;
   align-items: flex-start;
+}
 @media (max-width: 640px) {
   .item-main-content {
     flex-direction: row;
@@ -688,4 +689,469 @@
 
 .spec-icon {
   color: var(--color-primary);
+}
+
+/* ==========================================================================
+   NUEVO DISEÑO DE ÍTEMS DE PRODUCCIÓN — Tarjetas estilo Catálogo
+   ========================================================================== */
+
+/* Grid principal — controlado por inline style (gridTemplateColumns) */
+.production-items-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Tarjeta individual */
+.prod-card {
+  display: flex;
+  flex-direction: row;
+  height: 220px; /* Slightly taller for the new stacked structure */
+  overflow: hidden;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.prod-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Columna imagen — izquierda */
+.prod-card-img {
+  flex: 0 0 35%;
+  width: 35%;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface); /* White background like the card */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.prod-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transition: transform 0.4s ease;
+}
+
+.prod-card:hover .prod-card-img img {
+  transform: scale(1.05);
+}
+
+.prod-card-no-img {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+/* Badge de estado sobre la imagen */
+.prod-status-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.18rem 0.5rem;
+  border-radius: 99px;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+}
+
+.prod-status-badge.badge-pendiente  { background: rgba(245,158,11,0.85); color: #fff; }
+.prod-status-badge.badge-procesando { background: rgba(59,130,246,0.85);  color: #fff; }
+.prod-status-badge.badge-procesado  { background: rgba(34,197,94,0.85);   color: #fff; }
+
+/* Columna derecha — contenido */
+.prod-card-body {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1.5px solid var(--color-border);
+}
+
+.prod-card-header-block {
+  padding: 0.65rem 1rem;
+  border-bottom: 1.5px solid var(--color-border);
+  text-align: center;
+}
+
+.prod-card-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+/* Parámetros */
+.prod-card-params-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 0;
+  overflow: hidden;
+  padding: 0.65rem 1rem;
+}
+
+.prod-param-line {
+  font-size: 0.8rem;
+  color: var(--color-text-dark);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prod-param-label {
+  font-weight: 600;
+  color: var(--color-text-dark);
+}
+
+.prod-param-color {
+  color: var(--color-text-light);
+}
+
+.prod-param-desc {
+  font-size: 0.77rem;
+  color: var(--color-text-light);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
+
+.prod-card-thumbs-block {
+  padding: 0.45rem 1rem;
+  border-top: 1.5px solid var(--color-border);
+  display: flex;
+  justify-content: flex-start;
+}
+
+.prod-card-action-block {
+  border-top: 1.5px solid var(--color-border);
+  display: flex;
+}
+
+.btn-action-full {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  text-align: center;
+}
+
+.btn-amber-full {
+  color: var(--color-text-dark);
+}
+
+.btn-amber-full:hover {
+  background: rgba(230, 126, 34, 0.1);
+  color: var(--color-accent-amber);
+}
+
+.btn-green-full {
+  color: var(--color-text-dark);
+}
+
+.btn-green-full:hover {
+  background: rgba(46, 125, 50, 0.1);
+  color: var(--color-accent-green);
+}
+
+.action-full-text {
+  width: 100%;
+  padding: 0.75rem;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: rgba(46, 125, 50, 0.05);
+}
+
+/* Grupo de miniaturas */
+.prod-ref-thumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Cuadro miniatura (imagen de referencia o placeholder) */
+.prod-ref-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface-2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.prod-ref-thumb:hover {
+  border-color: var(--color-primary);
+}
+
+.prod-ref-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Placeholder vacío */
+.prod-ref-empty {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.prod-ref-empty:hover {
+  border-color: var(--color-border);
+}
+
+/* Botón de información (?) */
+.prod-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.prod-info-btn:hover {
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+/* Badge de estado sobre la imagen */
+.prod-status-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.18rem 0.5rem;
+  border-radius: 99px;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+}
+
+.prod-status-badge.badge-pendiente  { background: rgba(245,158,11,0.85); color: #fff; }
+.prod-status-badge.badge-procesando { background: rgba(59,130,246,0.85);  color: #fff; }
+.prod-status-badge.badge-procesado  { background: rgba(34,197,94,0.85);   color: #fff; }
+
+/* Columna derecha — contenido */
+.prod-card-body {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1.5px solid var(--color-border);
+}
+
+.prod-card-header-block {
+  padding: 0.65rem 1rem;
+  border-bottom: 1.5px solid var(--color-border);
+  text-align: center;
+}
+
+.prod-card-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+/* Parámetros */
+.prod-card-params-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 0;
+  overflow: hidden;
+  padding: 0.65rem 1rem;
+}
+
+.prod-param-line {
+  font-size: 0.8rem;
+  color: var(--color-text-dark);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prod-param-label {
+  font-weight: 600;
+  color: var(--color-text-dark);
+}
+
+.prod-param-color {
+  color: var(--color-text-light);
+}
+
+.prod-param-desc {
+  font-size: 0.77rem;
+  color: var(--color-text-light);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
+
+.prod-card-thumbs-block {
+  padding: 0.45rem 1rem;
+  border-top: 1.5px solid var(--color-border);
+  display: flex;
+  justify-content: flex-start;
+}
+
+.prod-card-action-block {
+  border-top: 1.5px solid var(--color-border);
+  display: flex;
+}
+
+.btn-action-full {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  text-align: center;
+}
+
+.btn-amber-full {
+  color: var(--color-text-dark);
+}
+
+.btn-amber-full:hover {
+  background: rgba(230, 126, 34, 0.1);
+  color: var(--color-accent-amber);
+}
+
+.btn-green-full {
+  color: var(--color-text-dark);
+}
+
+.btn-green-full:hover {
+  background: rgba(46, 125, 50, 0.1);
+  color: var(--color-accent-green);
+}
+
+.action-full-text {
+  width: 100%;
+  padding: 0.75rem;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: rgba(46, 125, 50, 0.05);
+}
+
+/* Grupo de miniaturas */
+.prod-ref-thumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Cuadro miniatura (imagen de referencia o placeholder) */
+.prod-ref-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface-2);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+
+.prod-ref-thumb:hover {
+  border-color: var(--color-primary);
+}
+
+.prod-ref-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Placeholder vacío */
+.prod-ref-empty {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.prod-ref-empty:hover {
+  border-color: var(--color-border);
+}
+
+/* Botón de información (?) */
+.prod-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.prod-info-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-surface-2);
+}
+
+/* Mobile: 1 tarjeta por fila */
+@media (max-width: 640px) {
+  .production-items-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Tablet: 2 tarjetas por fila */
+@media (min-width: 641px) and (max-width: 900px) {
+  .production-items-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }

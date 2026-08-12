@@ -1,17 +1,29 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
-import { Plus, Search, Filter, ShoppingCart, Package, PlusCircle, MinusCircle, X, Image as ImageIcon, Warehouse } from 'lucide-react';
+import { Plus, Search, Filter, ShoppingCart, Package, PlusCircle, MinusCircle, X, Image as ImageIcon, Warehouse, LayoutGrid, Grid2x2, Grid3x3 } from 'lucide-react';
 import ProtectedImage from '../components/ProtectedImage';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/formatters';
 import './Stock.css';
 
 function Stock() {
-  const { stock = [], catalogo = [], config = {}, addToCart, addStockItem, adjustStockCount, showNotification, hasPermission } = useApp();
+  const { stock = [], catalogo = [], config = {}, cart = [], addToCart, addStockItem, adjustStockCount, showNotification, hasPermission } = useApp();
   const [search, setSearch] = useState('');
   const [selectedArea, setSelectedArea] = useState('Todos');
   const [showModal, setShowModal] = useState(false);
   const [failedImages, setFailedImages] = useState({});
+
+  // Densidad de grid: 3 columnas (default), 4 ó 5. Se guarda en localStorage.
+  const [gridCols, setGridCols] = useState(() => {
+    const saved = localStorage.getItem('venus_stock_grid_cols');
+    const n = parseInt(saved, 10);
+    return n >= 3 && n <= 5 ? n : 3;
+  });
+
+  const setGrid = (cols) => {
+    setGridCols(cols);
+    localStorage.setItem('venus_stock_grid_cols', String(cols));
+  };
 
   const safeMaterialesBase = ['Ninguno', ...(config?.materiales || ['Madera Pino', 'Madera Caoba', 'MDF', 'Metal', 'Cristal']).filter(m => m.toLowerCase() !== 'ninguno')];
   const safeTelasOptions = ['Ninguno', ...(config?.telas || ['Lino', 'Terciopelo', 'Sintético', 'Cuero', 'Yute']).filter(t => t.toLowerCase() !== 'ninguno' && t.toLowerCase() !== 'ninguna (sin tela)')];
@@ -68,8 +80,19 @@ function Stock() {
     return val || null;
   };
 
-  const filteredStock = (stock || []).filter(item => {
-    const matchCantidad = (item.cantidad || 0) > 0;
+  const getAvailableQuantity = (stockItem) => {
+    // Buscar cuántas unidades de ESTE stockItem están ya en el carrito
+    const inCartQty = cart
+      .filter(cartItem => cartItem.isStock && String(cartItem.stock_id) === String(stockItem.id))
+      .reduce((sum, cartItem) => sum + (parseInt(cartItem.cantidad, 10) || 1), 0);
+    return Math.max(0, (stockItem.cantidad || 0) - inCartQty);
+  };
+
+  const filteredStock = (stock || []).map(item => ({
+    ...item,
+    availableCantidad: getAvailableQuantity(item)
+  })).filter(item => {
+    const matchCantidad = item.availableCantidad > 0;
     const matchSearch = (item.nombre || '').toLowerCase().includes(search.toLowerCase()) ||
                         (item.tela || item.color || '').toLowerCase().includes(search.toLowerCase()) ||
                         (item.material || '').toLowerCase().includes(search.toLowerCase());
@@ -175,6 +198,32 @@ function Stock() {
           <select value={selectedArea} onChange={e => setSelectedArea(e.target.value)}>
             {areasList.map(a => <option key={a} value={a}>Área: {a}</option>)}
           </select>
+
+          {/* Botones de densidad de grid */}
+          <div className="grid-density-toggle">
+            <button
+              className={`grid-density-btn${gridCols === 3 ? ' active' : ''}`}
+              onClick={() => setGrid(3)}
+              title="3 por fila (vista grande)"
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              className={`grid-density-btn${gridCols === 4 ? ' active' : ''}`}
+              onClick={() => setGrid(4)}
+              title="4 por fila"
+            >
+              <Grid2x2 size={16} />
+            </button>
+            <button
+              className={`grid-density-btn${gridCols === 5 ? ' active' : ''}`}
+              onClick={() => setGrid(5)}
+              title="5 por fila (vista compacta)"
+            >
+              <Grid3x3 size={16} />
+            </button>
+          </div>
+
           <button 
             className="btn-action-primary" 
             onClick={handleOpenModal}
@@ -187,29 +236,14 @@ function Stock() {
       </div>
 
       {/* Grid de Stock */}
-      <div className="stock-grid">
+      <div className="stock-grid" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
         {filteredStock.map(item => {
           const hasImage = item.image_url && !failedImages[item.id];
           // Calcular ancho de columna imagen según aspect_ratio real
-          const CARD_HEIGHT = 200;
-          const parseRatio = (ar) => {
-            if (!ar) return null;
-            if (typeof ar === 'number') return ar;
-            if (typeof ar === 'string' && ar.includes(':')) {
-              const [w, h] = ar.split(':').map(Number);
-              return (w && h) ? w / h : null;
-            }
-            const n = parseFloat(ar);
-            return isNaN(n) ? null : n;
-          };
-          const ratio = parseRatio(item.aspect_ratio);
-          const imgColStyle = ratio
-            ? { flex: `0 0 ${Math.round(CARD_HEIGHT * ratio)}px`, width: `${Math.round(CARD_HEIGHT * ratio)}px` }
-            : { flex: '0 0 47%' };
           return (
             <div key={item.id} className="stock-card glass-panel">
-              {/* Columna Imagen — ancho calculado por aspect_ratio real */}
-              <div className="stock-image-col" style={imgColStyle}>
+              {/* Columna Imagen — 42% del ancho del card, escala proporcional */}
+              <div className="stock-image-col">
                 {hasImage ? (
                   <ProtectedImage 
                     src={item.image_url} 
@@ -229,7 +263,7 @@ function Stock() {
                   <span className="badge-stock-area">Stock</span>
                 )}
                 <div className="quantity-badge">
-                  <Package size={12} /> {item.cantidad} disps.
+                  <Package size={12} /> {item.availableCantidad} disps.
                 </div>
               </div>
 
@@ -261,10 +295,10 @@ function Stock() {
                   <button 
                     className="btn-card-primary"
                     onClick={() => addToCart(item, true)}
-                    disabled={item.cantidad <= 0 || !hasPermission('facturas_emitir')}
+                    disabled={item.availableCantidad <= 0 || !hasPermission('facturas_emitir')}
                     title={!hasPermission('facturas_emitir') ? 'Sin permiso para vender (facturar)' : ''}
                   >
-                    <ShoppingCart size={14} /> {item.cantidad > 0 ? 'Vender Stock' : 'Agotado'}
+                    <ShoppingCart size={14} /> {item.availableCantidad > 0 ? 'Vender Stock' : 'Agotado'}
                   </button>
                 </div>
               </div>

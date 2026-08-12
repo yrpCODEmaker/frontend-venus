@@ -199,3 +199,71 @@ input, select, textarea {
     font-size: 1.15rem;
   }
 }
+
+/* ==========================================================================
+   BOTONES DE DENSIDAD DE GRID (Catálogo y Stock)
+   ========================================================================== */
+
+.grid-density-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.grid-density-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.grid-density-btn:hover {
+  background: var(--color-surface);
+  color: var(--color-text-dark);
+}
+
+.grid-density-btn.active {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   MOBILE OVERRIDES — Catálogo y Stock: 1 col (nivel 1) y 2 col (nivel 2)
+   El JS no aplica en mobile: CSS !important sobreescribe inline style
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  /* Ocultar botones de densidad en mobile — solo hay 2 niveles manejados por CSS */
+  .grid-density-toggle {
+    display: none;
+  }
+
+  /* Nivel 1 mobile: 1 tarjeta por fila */
+  .catalog-grid,
+  .stock-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Nivel 2 mobile (641px–900px): 2 tarjetas por fila */
+@media (min-width: 641px) and (max-width: 900px) {
+  .catalog-grid,
+  .stock-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .grid-density-toggle {
+    display: none;
+  }
+}

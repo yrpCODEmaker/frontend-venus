@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { PackageSearch, Warehouse, Hammer, ReceiptText, Settings, LogOut, Sun, Moon, Menu, X, ShoppingCart, TrendingUp } from 'lucide-react';
+import { PackageSearch, Warehouse, Hammer, ReceiptText, Settings, LogOut, Sun, Moon, Menu, X, ShoppingCart, TrendingUp, Minimize2, Maximize2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import './Layout.css';
 
@@ -9,6 +9,18 @@ function Layout({ children }) {
   const navigate = useNavigate();
   const { theme, toggleTheme, cart = [], logoutUser, notification, hasPermission, user } = useApp();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Modo compacto: reduce el tamaño de las cards un 25% en móvil
+  const [compactMode, setCompactMode] = useState(() => {
+    return localStorage.getItem('venus_compact_mode') === 'true';
+  });
+  const toggleCompactMode = () => {
+    setCompactMode(prev => {
+      const next = !prev;
+      localStorage.setItem('venus_compact_mode', String(next));
+      return next;
+    });
+  };
 
   const totalItemsCount = cart.reduce((sum, item) => sum + item.cantidad, 0);
 
@@ -40,6 +52,15 @@ function Layout({ children }) {
           <img src="/venus_muebles_avatar.jpg" alt="Venus Logo" className="app-logo-avatar" />
           <h2>Venus</h2>
         </div>
+
+        <button
+          className={`compact-toggle-btn ${compactMode ? 'active' : ''}`}
+          onClick={toggleCompactMode}
+          title={compactMode ? 'Volver al tamaño normal' : 'Modo compacto (ver más elementos)'}
+          aria-label="Alternar modo compacto"
+        >
+          {compactMode ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+        </button>
       </div>
 
       {/* Overlay oscuro cuando el menú móvil está abierto */}
@@ -111,14 +132,16 @@ function Layout({ children }) {
       </nav>
 
       {/* Contenido Principal */}
-      <main className="main-content animate-fade-in">
-        {notification && (
-          <div className={`global-toast toast-${notification.type} animate-fade-in`}>
-            {notification.message}
-          </div>
-        )}
+      <main className={`main-content animate-fade-in${compactMode ? ' compact-mode' : ''}`}>
         {children}
       </main>
+
+      {/* Toast global - siempre flotante, visible independientemente del scroll */}
+      {notification && (
+        <div className={`global-toast toast-${notification.type} animate-fade-in`}>
+          {notification.message}
+        </div>
+      )}
 
       {/* Botón Flotante Dinámico (3 Estados: Catálogo → Stock → POS → Catálogo) */}
       {(location.pathname.startsWith('/catalog') || location.pathname.startsWith('/stock') || location.pathname.startsWith('/invoices')) && (() => {

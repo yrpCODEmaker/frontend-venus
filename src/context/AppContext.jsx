@@ -316,6 +316,7 @@ export const AppProvider = ({ children }) => {
     setCart(prev => {
       return [...prev, {
         ...productItem,
+        stock_id: isStock ? productItem.id : null,
         id: Date.now() + Math.random(),
         catalogo_id: productItem.catalogo_id || productItem.id,
         nombre: productItem.nombre,
@@ -329,7 +330,7 @@ export const AppProvider = ({ children }) => {
         imagenes_apoyo_previews: productItem.imagenes_apoyo_previews || [],
         imagenes_apoyo: productItem.imagenes_apoyo || [],
         precio: productItem.precio_base || productItem.precio || 0,
-        cantidad: productItem.cantidad || 1,
+        cantidad: isStock ? 1 : (productItem.cantidad || 1),
         isStock,
         area: productItem.area || 'Tapicería',
         tipo_mueble: productItem.tipo || productItem.tipo_mueble || 'Mueble'

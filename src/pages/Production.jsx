@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
-import { Hammer, ReceiptText, Truck, CheckCircle2, PlayCircle, Clock, MapPin, User, Check, ArrowRight, Layers, AlertCircle, Image as ImageIcon, X, Filter, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { Hammer, ReceiptText, Truck, CheckCircle2, PlayCircle, Clock, MapPin, User, Check, ArrowRight, Layers, AlertCircle, Image as ImageIcon, X, Filter, SlidersHorizontal, RefreshCw, HelpCircle, LayoutGrid, Grid2x2, Grid3x3 } from 'lucide-react';
 import ProtectedImage from '../components/ProtectedImage';
 import { extractImageUrl, getApiBaseUrl } from '../services/api';
 import { formatItemJSON, formatArea, formatMaterialAndTela, cleanFieldValue } from '../utils/formatters';
@@ -14,6 +14,18 @@ function Production() {
   const [areaFilter, setAreaFilter] = useState('Todos');
   const [tipoFilter, setTipoFilter] = useState('Todos');
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [detailModalItem, setDetailModalItem] = useState(null); // Item para el modal de info oculta (?)
+
+  // Densidad de grid (Por Ítems): 3 columnas (default), 4 ó 5
+  const [gridCols, setGridCols] = useState(() => {
+    const saved = localStorage.getItem('venus_production_grid_cols');
+    const n = parseInt(saved, 10);
+    return n >= 3 && n <= 5 ? n : 3;
+  });
+  const setGrid = (cols) => {
+    setGridCols(cols);
+    localStorage.setItem('venus_production_grid_cols', String(cols));
+  };
 
   const getSupportImagesList = (item) => {
     if (!item) return [];
@@ -171,6 +183,120 @@ function Production() {
     return true;
   });
 
+  // Función para renderizar la tarjeta de un ítem individual
+  const renderItemCard = (item) => {
+    const imgUrl = extractImageUrl(item) || item.image_url;
+    const hasValidImg = !!imgUrl;
+    const supportImgs = getSupportImagesList(item).slice(0, 3);
+    const p = getFormattedParams(item);
+
+    return (
+      <div key={item.id} className={`prod-card glass-panel status-${item.status}`}>
+        {/* Imagen principal — izquierda, 42% ancho */}
+        <div
+          className="prod-card-img"
+          onClick={() => hasValidImg && setLightboxImage({ url: imgUrl, title: `${item.nombre} (Imagen Principal)` })}
+          title={hasValidImg ? 'Ver imagen en grande' : ''}
+          style={{ cursor: hasValidImg ? 'pointer' : 'default' }}
+        >
+          {hasValidImg ? (
+            <ProtectedImage src={imgUrl} alt={item.nombre} />
+          ) : (
+            <div className="prod-card-no-img"><ImageIcon size={36} /></div>
+          )}
+          {/* Badge de estado superpuesto sobre la imagen */}
+          <span className={`prod-status-badge badge-${item.status}`}>
+            {item.status === 'pendiente' && 'Pendiente'}
+            {item.status === 'procesando' && 'Fab.'}
+            {item.status === 'procesado' && 'Listo'}
+          </span>
+        </div>
+
+        {/* Contenido derecho */}
+        <div className="prod-card-body">
+          {/* Nombre del producto */}
+          <div className="prod-card-header-block">
+            <h3 className="prod-card-name">{item.nombre}</h3>
+          </div>
+
+          {/* Parámetros (solo si no son null) */}
+          <div className="prod-card-params-block">
+            {p.material && (
+              <p className="prod-param-line">
+                <span className="prod-param-label">Material:</span> {p.material}
+                {p.materialColor && <span className="prod-param-color"> · {p.materialColor}</span>}
+              </p>
+            )}
+            {p.tela && (
+              <p className="prod-param-line">
+                <span className="prod-param-label">Tela:</span> {p.tela}
+                {p.telaColor && <span className="prod-param-color"> · {p.telaColor}</span>}
+              </p>
+            )}
+            {item.descripcion && (
+              <p className="prod-param-desc" title={item.descripcion}>{item.descripcion}</p>
+            )}
+          </div>
+
+          {/* Fila inferior: miniaturas + botón ? */}
+          <div className="prod-card-thumbs-block">
+            <div className="prod-ref-thumbs">
+              {supportImgs.map((url, idx) => (
+                <div
+                  key={idx}
+                  className="prod-ref-thumb"
+                  onClick={() => setLightboxImage({ url, title: `${item.nombre} — Referencia #${idx + 1}` })}
+                  title="Ver imagen de referencia"
+                >
+                  <ProtectedImage src={url} alt={`Ref ${idx + 1}`} />
+                </div>
+              ))}
+              {/* Placeholders vacíos hasta completar 3 cuadros */}
+              {Array.from({ length: Math.max(0, 3 - supportImgs.length) }).map((_, i) => (
+                <div key={`empty-${i}`} className="prod-ref-thumb prod-ref-empty" />
+              ))}
+              {/* Botón ? — abre modal con info oculta */}
+              <button
+                className="prod-ref-thumb prod-info-btn"
+                onClick={() => setDetailModalItem(item)}
+                title="Ver información completa del encargo"
+              >
+                <HelpCircle size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Botón de acción de estado */}
+          <div className="prod-card-action-block">
+            {item.status === 'pendiente' && (
+              <button
+                className="btn-action-full btn-amber-full"
+                onClick={() => updateItemStatus(item.id, 'procesando')}
+                disabled={!hasPermission('fabricacion_modificar_estados')}
+              >
+                Iniciar fabricacion
+              </button>
+            )}
+            {item.status === 'procesando' && (
+              <button
+                className="btn-action-full btn-green-full"
+                onClick={() => updateItemStatus(item.id, 'procesado')}
+                disabled={!hasPermission('fabricacion_modificar_estados')}
+              >
+                Marcar como Listo
+              </button>
+            )}
+            {item.status === 'procesado' && (
+              <div className="action-full-text text-success">
+                Listo en taller
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="page-container animate-fade-in">
       {/* Tarjetas de Estadísticas */}
@@ -260,6 +386,21 @@ function Production() {
             <RefreshCw size={12} /> Limpiar Filtros
           </button>
         )}
+
+        {/* Botones densidad de grid (solo visible en tab items) */}
+        {activeTab === 'items' && (
+          <div className="grid-density-toggle" style={{ marginLeft: 'auto' }}>
+            <button className={`grid-density-btn${gridCols === 3 ? ' active' : ''}`} onClick={() => setGrid(3)} title="3 por fila">
+              <LayoutGrid size={15} />
+            </button>
+            <button className={`grid-density-btn${gridCols === 4 ? ' active' : ''}`} onClick={() => setGrid(4)} title="4 por fila">
+              <Grid2x2 size={15} />
+            </button>
+            <button className={`grid-density-btn${gridCols === 5 ? ' active' : ''}`} onClick={() => setGrid(5)} title="5 por fila">
+              <Grid3x3 size={15} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabs Secundarios */}
@@ -284,166 +425,68 @@ function Production() {
         </button>
       </div>
 
-      {/* VISTA 1: POR ÍTEMS */}
       {activeTab === 'items' && (
         <div className="production-view animate-fade-in">
-          <div className="items-list-container">
-            {filteredItems.map(item => {
-              // Resolver imagen del ítem (con fallback inteligente a image_id o catálogo)
-              const imgUrl = extractImageUrl(item) || item.image_url;
-              const hasValidImg = !!imgUrl;
-
-              return (
-                <div key={item.id} className={`production-card glass-panel status-${item.status}`}>
-                  <div className="item-main-content">
-                    <div 
-                      className="item-thumbnail-box clickable" 
-                      onClick={() => hasValidImg && setLightboxImage({ url: imgUrl, title: `${item.nombre} (Imagen Principal)` })}
-                      title={hasValidImg ? "Haz clic para ver imagen principal en grande" : ""}
-                    >
-                      {hasValidImg ? (
-                        <ProtectedImage 
-                          src={imgUrl} 
-                          alt={item.nombre}
-                        />
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-muted)' }}>
-                          <ImageIcon size={48} />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="item-info-col">
-                      <div className="item-header">
-                        <div className="item-title-group">
-                          <h3>{item.nombre}</h3>
-                          <span className="item-fact-tag">Fact #{item.factura_id}</span>
-                        </div>
-                        <span className={`status-badge badge-${item.status}`}>
-                          {item.status === 'pendiente' && 'Pendiente'}
-                          {item.status === 'procesando' && 'En Fabricación'}
-                          {item.status === 'procesado' && 'Listo'}
-                        </span>
-                      </div>
-
-                      {(() => {
-                        const p = getFormattedParams(item);
-                        return (
-                          <div className="item-specs-grid">
-                            {p.area && (
-                              <div className="spec-badge">
-                                <span className="spec-label">Área:</span>
-                                <span className="spec-value">{p.area}</span>
-                              </div>
-                            )}
-                            {p.tipo && (
-                              <div className="spec-badge">
-                                <span className="spec-label">Tipo:</span>
-                                <span className="spec-value">{p.tipo}</span>
-                              </div>
-                            )}
-                            {p.material && (
-                              <div className="spec-badge spec-material">
-                                <span className="spec-label">Material:</span>
-                                <span className="spec-value">{p.material}</span>
-                                {p.materialColor && (
-                                  <>
-                                    <span className="spec-sublabel">Color:</span>
-                                    <span className="spec-subvalue">{p.materialColor}</span>
-                                  </>
-                                )}
-                              </div>
-                            )}
-                            {p.tela && (
-                              <div className="spec-badge spec-tela">
-                                <span className="spec-label">Tela:</span>
-                                <span className="spec-value">{p.tela}</span>
-                                {p.telaColor && (
-                                  <>
-                                    <span className="spec-sublabel">Color:</span>
-                                    <span className="spec-subvalue">{p.telaColor}</span>
-                                  </>
-                                )}
-                              </div>
-                            )}
-                            {getClientName(item) && (
-                              <div className="spec-badge spec-client">
-                                <User size={13} className="spec-icon" />
-                                <span className="spec-label">Cliente:</span>
-                                <span className="spec-value">{getClientName(item)}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {item.descripcion && (
-                        <div className="item-order-desc">
-                          <strong>📝 Detalle del Encargo:</strong> {item.descripcion}
-                        </div>
-                      )}
-
-                      {/* Imágenes de Apoyo (Texturas, Patrones, Pintura) */}
-                      {(() => {
-                        const supportImgs = getSupportImagesList(item);
-                        if (supportImgs.length === 0) return null;
-                        return (
-                          <div className="support-images-container">
-                            <span className="support-images-title">🎨 Imágenes de Apoyo (Texturas / Patrones):</span>
-                            <div className="support-images-row">
-                              {supportImgs.map((url, idx) => (
-                                <div 
-                                  key={idx} 
-                                  className="support-image-item" 
-                                  onClick={() => setLightboxImage({ url, title: `${item.nombre} — Imagen de Apoyo #${idx + 1}` })}
-                                  title="Haz clic para ampliar imagen de apoyo"
-                                >
-                                  <ProtectedImage src={url} alt={`Apoyo ${idx + 1}`} />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-
-                  <div className="item-footer">
-                    {item.status === 'pendiente' && (
-                      <button 
-                        className="btn-status-action btn-amber" 
-                        onClick={() => updateItemStatus(item.id, 'procesando')}
-                        disabled={!hasPermission('fabricacion_modificar_estados')}
-                        title={!hasPermission('fabricacion_modificar_estados') ? 'Sin permiso para cambiar estado' : ''}
-                      >
-                        <PlayCircle size={16} /> Iniciar Fabricación
-                      </button>
-                    )}
-                    {item.status === 'procesando' && (
-                      <button 
-                        className="btn-status-action btn-green" 
-                        onClick={() => updateItemStatus(item.id, 'procesado')}
-                        disabled={!hasPermission('fabricacion_modificar_estados')}
-                        title={!hasPermission('fabricacion_modificar_estados') ? 'Sin permiso para cambiar estado' : ''}
-                      >
-                        <CheckCircle2 size={16} /> Marcar como Listo
-                      </button>
-                    )}
-                    {item.status === 'procesado' && (
-                      <span className="text-success"><Check size={16} /> Producto terminado y listo en taller</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+          {/* Grid de tarjetas estilo catálogo */}
+          <div className="production-items-grid" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
+            {filteredItems.map(item => renderItemCard(item))}
 
             {filteredItems.length === 0 && (
-              <div className="empty-state glass-panel">
+              <div className="empty-state glass-panel" style={{ gridColumn: '1 / -1' }}>
                 <p>No hay encargos de producción con este estado.</p>
               </div>
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal de Información Completa del Encargo (botón ?) */}
+      {detailModalItem && createPortal(
+        <div className="modal-overlay" onClick={() => setDetailModalItem(null)}>
+          <div className="modal-content glass-panel animate-fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h2>{detailModalItem.nombre}</h2>
+              <button className="btn-icon" onClick={() => setDetailModalItem(null)}><X size={20} /></button>
+            </div>
+            <div className="modal-form" style={{ gap: '0.75rem' }}>
+              {detailModalItem.factura_id && (
+                <p><strong>Factura ID:</strong> #{detailModalItem.factura_id}</p>
+              )}
+              {getClientName(detailModalItem) && (
+                <p><strong>Cliente:</strong> {getClientName(detailModalItem)}</p>
+              )}
+              {(() => { const p = getFormattedParams(detailModalItem); return (
+                <>
+                  {p.tipo && <p><strong>Tipo:</strong> {p.tipo}</p>}
+                  {p.area && <p><strong>Área:</strong> {p.area}</p>}
+                  {p.material && <p><strong>Material:</strong> {p.material}{p.materialColor ? ` · ${p.materialColor}` : ''}</p>}
+                  {p.tela && <p><strong>Tela:</strong> {p.tela}{p.telaColor ? ` · ${p.telaColor}` : ''}</p>}
+                </>
+              ); })()}
+              {detailModalItem.descripcion && (
+                <p><strong>Descripción:</strong> {detailModalItem.descripcion}</p>
+              )}
+              {/* Todas las imágenes de apoyo */}
+              {getSupportImagesList(detailModalItem).length > 0 && (
+                <div>
+                  <p><strong>Imágenes de apoyo:</strong></p>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                    {getSupportImagesList(detailModalItem).map((url, idx) => (
+                      <div
+                        key={idx}
+                        style={{ width: 70, height: 70, borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: '1px solid var(--color-border)' }}
+                        onClick={() => { setDetailModalItem(null); setLightboxImage({ url, title: `${detailModalItem.nombre} — Apoyo #${idx + 1}` }); }}
+                      >
+                        <ProtectedImage src={url} alt={`Apoyo ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* VISTA 2: POR FACTURA */}
@@ -494,19 +537,9 @@ function Production() {
                     <div className={`progress-fill progress-fill-${factStatus}`} style={{ width: `${progressPercent}%` }}></div>
                   </div>
 
-                  {/* Lista ultra básica y limpia de elementos */}
-                  <div className="fact-items-mini-list">
-                    {factItems.map(it => (
-                      <div key={it.id} className={`mini-item-chip status-${it.status}`}>
-                        <span className={`dot status-${it.status}`}></span>
-                        <span className="mini-item-name">
-                          <strong>{it.nombre}</strong>
-                          <small style={{ opacity: 0.8, marginLeft: '0.3rem' }}>
-                            ({it.status === 'pendiente' ? 'Pendiente' : it.status === 'procesando' ? 'En Proceso' : 'Listo'})
-                          </small>
-                        </span>
-                      </div>
-                    ))}
+                  {/* Elementos mostrados con diseño de tarjeta completa */}
+                  <div className="production-items-grid" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`, marginTop: '1rem', marginBottom: '1rem' }}>
+                    {factItems.map(it => renderItemCard(it))}
                   </div>
 
                   <div className="fact-card-footer">

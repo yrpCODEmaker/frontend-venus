@@ -130,11 +130,10 @@
   box-shadow: var(--shadow-md);
 }
 
-/* --- Columna imagen (lado izquierdo) ---
-   El ancho se aplica via inline style calculado desde aspect_ratio.
-   object-fit: contain porque el contenedor ya tiene el ratio exacto. */
+/* --- Columna imagen (lado izquierdo) --- */
 .card-image-col {
-  /* flex y width vienen del inline style dinámico */
+  flex: 0 0 42%;
+  width: 42%;
   flex-shrink: 0;
   position: relative;
   overflow: hidden;
@@ -144,7 +143,7 @@
 .card-image-col img {
   width: 100%;
   height: 100%;
-  object-fit: contain;         /* sin recorte: el contenedor ya coincide */
+  object-fit: cover;
   display: block;
   transition: transform 0.4s ease;
 }
