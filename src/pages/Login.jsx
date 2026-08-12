@@ -10,9 +10,7 @@ function Login() {
   const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [requiresOtp, setRequiresOtp] = useState(false);
-  const { loginUser, loading, notification, apiUrl, updateApiUrl } = useApp();
-  const [showConfig, setShowConfig] = useState(false);
-  const [tempUrl, setTempUrl] = useState(apiUrl);
+  const { loginUser, loading, notification, apiUrl } = useApp();
   const [serverStatus, setServerStatus] = useState('checking'); // 'online' | 'offline' | 'checking'
   const navigate = useNavigate();
 
@@ -43,25 +41,13 @@ function Login() {
     setOtpCode('');
   };
 
-  const handleSaveApiUrl = (e) => {
-    e.preventDefault();
-    updateApiUrl(tempUrl);
-    setShowConfig(false);
-    checkConnection();
-  };
 
-  const handleResetDefaultApiUrl = () => {
-    updateApiUrl(null);
-    setTempUrl('http://api.venusmuebles.com/api/v1');
-    setShowConfig(false);
-    checkConnection();
-  };
 
   return (
     <div className="login-container animate-fade-in">
       <div className="login-card glass-panel">
         <div className="login-header">
-          <div className="login-logo-glow"></div>
+          <img src="/venus_muebles_avatar.jpg" alt="Venus Logo" className="login-logo-img" />
           <h1>Venus</h1>
           <p>Sistema de Gestión e Inventario</p>
         </div>
@@ -87,9 +73,6 @@ function Login() {
                 <span>Servidor Desconectado / Inaccesible</span>
               </>
             )}
-          </div>
-          <div className="server-url-badge" title="Servidor configurado">
-            <Server size={12} /> {apiUrl}
           </div>
         </div>
 
@@ -169,37 +152,7 @@ function Login() {
           )}
         </form>
 
-        <div className="login-footer">
-          <button type="button" className="btn-server-config" onClick={() => setShowConfig(!showConfig)}>
-            <Server size={14} />
-            {showConfig ? 'Ocultar Configuración de Servidor' : 'Cambiar Servidor (URL / IP)'}
-          </button>
-        </div>
 
-        {showConfig && (
-          <form onSubmit={handleSaveApiUrl} className="server-config-form animate-fade-in">
-            <div className="input-group">
-              <label>URL o Dominio del Backend</label>
-              <input 
-                type="text" 
-                value={tempUrl} 
-                onChange={(e) => setTempUrl(e.target.value)}
-                placeholder="http://api.venusmuebles.com" 
-              />
-            </div>
-            <div className="config-actions-row">
-              <button type="button" className="btn-secondary" onClick={checkConnection} title="Probar conexión actual">
-                <RefreshCw size={14} /> Probar
-              </button>
-              <button type="submit" className="btn-action-primary">
-                <ShieldCheck size={14} /> Guardar
-              </button>
-              <button type="button" className="btn-reset-default" onClick={handleResetDefaultApiUrl} title="Restablecer a api.venusmuebles.com">
-                Por Defecto
-              </button>
-            </div>
-          </form>
-        )}
       </div>
     </div>
   );

@@ -39,13 +39,14 @@
   z-index: 1;
 }
 
-.login-logo-glow {
-  width: 60px;
-  height: 60px;
+.login-logo-img {
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  background: var(--color-primary);
+  object-fit: cover;
   box-shadow: 0 0 30px rgba(88, 166, 255, 0.4);
   margin-bottom: 0.5rem;
+  border: 2px solid rgba(88, 166, 255, 0.2);
 }
 
 .login-header h1 {

@@ -13,16 +13,26 @@ const getRuntimeHost = () => {
 
 const RUNTIME_HOST = getRuntimeHost();
 const WINDOWS_LOCAL_IP = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_LOCAL_MACHINE_IP ? import.meta.env.VITE_LOCAL_MACHINE_IP : null;
+const ENV_API_BASE_URL = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL : null;
+
+const isDevEnvironment = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.DEV;
+  }
+  return true;
+};
+
+const isProductionEnvironment = () => !isDevEnvironment();
 
 // IP preferida para celulares/LAN: 1) Hostname del celular, 2) IP de Windows inyectada por comando, 3) 127.0.0.1
 export const PRIMARY_LAN_IP = RUNTIME_HOST || WINDOWS_LOCAL_IP || '127.0.0.1';
 
-// Direcciones por defecto (API Local con IP de la PC primero -> Dominio como Fallback)
+// Direcciones por defecto: en producción se usa siempre el dominio real; en desarrollo se intenta primero local
 export const LOCAL_BASE_URL = `http://${PRIMARY_LAN_IP}:8000/api/v1`;
-export const DOMAIN_BASE_URL = 'http://api.venusmuebles.com/api/v1';
-const DEFAULT_BASE_URL = LOCAL_BASE_URL;
+export const DOMAIN_BASE_URL = 'https://api.venusmuebles.com/api/v1';
+const DEFAULT_BASE_URL = ENV_API_BASE_URL ? formatApiUrl(ENV_API_BASE_URL) : (isProductionEnvironment() ? DOMAIN_BASE_URL : LOCAL_BASE_URL);
 
-let activeAutoUrl = LOCAL_BASE_URL;
+let activeAutoUrl = DEFAULT_BASE_URL;
 
 /**
  * Normaliza cualquier entrada de IP, Dominio o URL
@@ -239,10 +249,11 @@ async function request(endpoint, options = {}) {
     return await response.json();
   } catch (error) {
     const stored = localStorage.getItem('venus_api_url');
-    // Si localhost falló por error de red y no hay URL manual guardada, probar automáticamente fallback a la API del dominio
-    if (!stored && activeAutoUrl === LOCAL_BASE_URL && (error.message?.includes('Failed to fetch') || error.name === 'TypeError' || error.message?.includes('NetworkError'))) {
+    const cleanEndpoint = endpoint.replace(/^\/+/, '');
+    // En producción no se debe intentar fallback automático a localhost. En desarrollo sí se puede redirigir al dominio si la API local falla.
+    if (!stored && isDevEnvironment() && activeAutoUrl === LOCAL_BASE_URL && (error.message?.includes('Failed to fetch') || error.name === 'TypeError' || error.message?.includes('NetworkError'))) {
       activeAutoUrl = DOMAIN_BASE_URL;
-      const fallbackUrl = `${DOMAIN_BASE_URL}${cleanEndpoint}`;
+      const fallbackUrl = `${DOMAIN_BASE_URL.replace(/\/+$/, '')}/${cleanEndpoint}`;
       try {
         const fallbackRes = await fetch(fallbackUrl, finalOptions);
         if (fallbackRes.ok) {
@@ -349,7 +360,33 @@ export const api = {
       }
     }
 
-    // 1. Candidatos de API Local (IP del celular, IP de Windows inyectada por comando, 127.0.0.1)
+    const envBaseUrl = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL ? formatApiUrl(import.meta.env.VITE_API_BASE_URL) : null;
+    if (envBaseUrl) {
+      activeAutoUrl = envBaseUrl;
+      try {
+        const base = envBaseUrl.replace(/\/api\/v1\/?$/, '');
+        const response = await fetch(`${base}/health`, { method: 'GET' });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    }
+
+    if (isProductionEnvironment()) {
+      activeAutoUrl = DOMAIN_BASE_URL;
+      try {
+        const domainBase = DOMAIN_BASE_URL.replace(/\/api\/v1\/?$/, '');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(`${domainBase}/health`, { method: 'GET', signal: controller.signal });
+        clearTimeout(timeoutId);
+        return res.ok;
+      } catch {
+        return false;
+      }
+    }
+
+    // 1. Candidatos de API Local (solo en desarrollo)
     const localCandidates = [];
     if (RUNTIME_HOST) {
       localCandidates.push(`http://${RUNTIME_HOST}:8000/api/v1`);
@@ -360,7 +397,6 @@ export const api = {
     localCandidates.push('http://127.0.0.1:8000/api/v1');
     localCandidates.push('http://localhost:8000/api/v1');
 
-    // Eliminar duplicados y nulos
     const uniqueLocalCandidates = Array.from(new Set(localCandidates.filter(Boolean)));
 
     for (const candidateUrl of uniqueLocalCandidates) {
@@ -379,7 +415,7 @@ export const api = {
       }
     }
 
-    // 2. Fallback a la API en la Nube (api.venusmuebles.com)
+    // 2. Fallback a la API en la Nube (solo en desarrollo)
     try {
       const domainBase = DOMAIN_BASE_URL.replace(/\/api\/v1\/?$/, '');
       const controller = new AbortController();
