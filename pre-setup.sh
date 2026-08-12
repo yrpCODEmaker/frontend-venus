@@ -10,7 +10,7 @@ apt-get install -y --no-install-recommends \
   git \
   build-essential \
   gnupg \
-  software-properties-common
+  lsb-release
 
 if ! command -v node >/dev/null 2>&1; then
   echo "[2/5] Instalando Node.js 20 LTS..."
