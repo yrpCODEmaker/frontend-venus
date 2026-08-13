@@ -35,8 +35,7 @@ else
   echo "Docker ya está instalado."
 fi
 
-echo "[5/5] Instalando dependencias globales necesarias..."
-npm install -g npm@latest
+echo "[5/5] Saltando actualización de npm (versión actual es compatible)..."
 
 printf "\n✅ Entorno de servidor listo.\n"
 printf "Ahora puedes clonar el repo y ejecutar:\n"
