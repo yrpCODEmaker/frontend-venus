@@ -38,7 +38,5 @@ fi
 echo "[5/5] Saltando actualización de npm (versión actual es compatible)..."
 
 printf "\n✅ Entorno de servidor listo.\n"
-printf "Ahora puedes clonar el repo y ejecutar:\n"
-printf "  npm install\n"
-printf "  npm run build\n"
+printf "Ahora puedes ejecutar:\n"
 printf "  ./setup.sh\n"
