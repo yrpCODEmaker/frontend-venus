@@ -30,19 +30,16 @@ export const PRIMARY_LAN_IP = RUNTIME_HOST || WINDOWS_LOCAL_IP || '127.0.0.1';
 // Direcciones por defecto: en producción se usa siempre el dominio real; en desarrollo se intenta primero local
 export const LOCAL_BASE_URL = `http://${PRIMARY_LAN_IP}:8000/api/v1`;
 export const DOMAIN_BASE_URL = 'https://api.venusmuebles.com/api/v1';
-const DEFAULT_BASE_URL = ENV_API_BASE_URL ? formatApiUrl(ENV_API_BASE_URL) : (isProductionEnvironment() ? DOMAIN_BASE_URL : LOCAL_BASE_URL);
-
-let activeAutoUrl = DEFAULT_BASE_URL;
 
 /**
  * Normaliza cualquier entrada de IP, Dominio o URL
  * (ej: "api.venusmuebles.com" -> "http://api.venusmuebles.com/api/v1")
  * (ej: "192.168.1.50" -> "http://192.168.1.50:8000/api/v1")
  */
-export const formatApiUrl = (rawUrl) => {
-  if (!rawUrl || typeof rawUrl !== 'string') return DEFAULT_BASE_URL;
+export function formatApiUrl(rawUrl, fallback = DOMAIN_BASE_URL) {
+  if (!rawUrl || typeof rawUrl !== 'string') return fallback;
   let clean = rawUrl.trim();
-  if (!clean) return DEFAULT_BASE_URL;
+  if (!clean) return fallback;
 
   // Añadir http:// si no se especificó un protocolo
   if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
@@ -65,7 +62,11 @@ export const formatApiUrl = (rawUrl) => {
   }
 
   return clean;
-};
+}
+
+const DEFAULT_BASE_URL = ENV_API_BASE_URL ? formatApiUrl(ENV_API_BASE_URL, DOMAIN_BASE_URL) : (isProductionEnvironment() ? DOMAIN_BASE_URL : LOCAL_BASE_URL);
+
+let activeAutoUrl = DEFAULT_BASE_URL;
 
 export const getApiBaseUrl = () => {
   const stored = localStorage.getItem('venus_api_url');
