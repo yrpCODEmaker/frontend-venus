@@ -163,3 +163,134 @@ export const formatMaterialAndTela = (material, tela) => {
 export const formatItemJSON = (value) => {
   return cleanFieldValue(value);
 };
+
+/**
+ * Genera el texto formateado de una factura listo para enviar por WhatsApp.
+ * @param {Object} factura - Objeto de la factura
+ * @param {Array} groupedItems - Lista de artículos agrupados
+ * @param {Object} companyInfo - Datos de la empresa (nombre, teléfono, rnc, etc.)
+ * @returns {string} - Texto formateado listo para WhatsApp
+ */
+export const formatInvoiceWhatsAppText = (factura, groupedItems = [], companyInfo = {}) => {
+  if (!factura) return '';
+
+  const companyName = companyInfo?.nombre_empresa || 'Muebles Venus';
+  const companyPhone = companyInfo?.telefono || '';
+  const companyRnc = companyInfo?.rnc || '';
+  const companyDir = companyInfo?.direccion || '';
+
+  // Datos del cliente
+  const clientName = [
+    factura.cliente_nombre || factura.cliente?.nombre || '',
+    factura.cliente_apellido || factura.cliente?.apellido || ''
+  ].filter(Boolean).join(' ').trim() || 'Cliente';
+
+  const clientPhone = factura.cliente_telefono || factura.cliente?.telefono || '';
+  const clientAddress = factura.cliente_domicilio || factura.cliente?.domicilio || '';
+
+  // Fechas y Folio
+  const invoiceId = factura.id ? `#${factura.id}` : '';
+  const dateValue = factura.fecha || factura.created_at;
+  const fechaStr = dateValue
+    ? new Date(dateValue).toLocaleDateString('es-DO', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      })
+    : new Date().toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  // Cálculos financieros
+  const total = parseFloat(factura.total) || 0;
+  const pagado = parseFloat(factura.monto_pagado) || 0;
+  const balance = Math.max(0, total - pagado);
+
+  const lines = [];
+
+  // Encabezado
+  lines.push(`🧾 *FACTURA ${invoiceId}*`);
+  lines.push(`🏢 *${companyName}*`);
+  if (companyRnc) lines.push(`📄 RNC: ${companyRnc}`);
+  if (companyPhone) lines.push(`📞 Tel: ${companyPhone}`);
+  if (companyDir) lines.push(`📍 ${companyDir}`);
+  lines.push(`───────────────────────`);
+
+  // Información del Cliente
+  lines.push(`👤 *Cliente:* ${clientName}`);
+  if (clientPhone) lines.push(`📱 *Tel:* ${clientPhone}`);
+  if (clientAddress) lines.push(`🏠 *Dirección:* ${clientAddress}`);
+  lines.push(`📅 *Fecha:* ${fechaStr}`);
+  
+  if (factura.entrega_domicilio) {
+    const dirEntrega = factura.direccion_entrega || clientAddress;
+    lines.push(`🚚 *Entrega:* A Domicilio${dirEntrega ? ` (${dirEntrega})` : ''}`);
+  } else {
+    lines.push(`📦 *Entrega:* Retiro en Tienda`);
+  }
+
+  if (factura.garantia_hasta) {
+    lines.push(`🛡️ *Garantía:* ${factura.garantia_hasta}`);
+  }
+
+  lines.push(`───────────────────────`);
+  lines.push(`📋 *DETALLE DE ARTÍCULOS:*`);
+
+  const itemsList = (groupedItems && groupedItems.length > 0)
+    ? groupedItems
+    : (factura.items || []);
+
+  if (itemsList.length === 0) {
+    lines.push(`(Sin artículos detallados)`);
+  } else {
+    itemsList.forEach((it, idx) => {
+      const cant = it.cantidad || 1;
+      const sub = parseFloat(it.subtotal) || 0;
+      const unit = cant > 0 ? (sub / cant) : sub;
+      
+      lines.push(``);
+      lines.push(`${idx + 1}️⃣ *${cant}x ${it.nombre}*`);
+      lines.push(`   ▫️ Precio: $${formatCurrency(unit)} | Subtotal: $${formatCurrency(sub)}`);
+
+      const area = formatArea(it.area);
+      const tipo = cleanFieldValue(it.tipo_mueble || it.tipo);
+      const matTela = formatMaterialAndTela(it.material, it.tela);
+      const color = cleanFieldValue(it.color);
+
+      const itemSpecs = [];
+      if (area || tipo) itemSpecs.push([area, tipo].filter(Boolean).join(' / '));
+      if (color) itemSpecs.push(`Color: ${color}`);
+      if (matTela) itemSpecs.push(matTela);
+
+      if (itemSpecs.length > 0) {
+        lines.push(`   ▫️ ${itemSpecs.join(' · ')}`);
+      }
+
+      const desc = cleanFieldValue(it.descripcion);
+      if (desc) {
+        lines.push(`   ▫️ _Nota: ${desc}_`);
+      }
+    });
+  }
+
+  lines.push(``);
+  lines.push(`───────────────────────`);
+  lines.push(`💰 *RESUMEN DE PAGO:*`);
+  lines.push(`💵 *Total:* $${formatCurrency(total)}`);
+  lines.push(`✅ *Abonado:* $${formatCurrency(pagado)}`);
+  lines.push(`⏳ *Balance Pendiente:* $${formatCurrency(balance)}`);
+
+  if (factura.declarado_perdida === 1) {
+    lines.push(`⚠️ *Estado:* Declarada en Pérdida`);
+  } else if (factura.declarado_perdonado === 1) {
+    lines.push(`🎁 *Estado:* Saldo Perdonado`);
+  } else if (balance <= 0) {
+    lines.push(`🎉 *Estado:* PAGADA`);
+  } else {
+    lines.push(`⚠️ *Estado:* PENDIENTE DE PAGO`);
+  }
+
+  lines.push(`───────────────────────`);
+  lines.push(`✨ _¡Muchas gracias por su preferencia!_`);
+
+  return lines.join('\n');
+};
+

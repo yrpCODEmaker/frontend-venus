@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
-import { formatCurrency, formatCurrencyInput, parseCurrencyInput, formatPhoneInput, formatItemJSON, formatArea, formatMaterialAndTela, cleanFieldValue } from '../utils/formatters';
-import { ShoppingCart, ReceiptText, Plus, Trash2, UserPlus, DollarSign, Search, Eye, CheckCircle, Truck, X, UserCheck, Zap, Loader2, FileDown, Image } from 'lucide-react';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput, formatPhoneInput, formatItemJSON, formatArea, formatMaterialAndTela, cleanFieldValue, formatInvoiceWhatsAppText } from '../utils/formatters';
+import { ShoppingCart, ReceiptText, Plus, Trash2, UserPlus, DollarSign, Search, Eye, CheckCircle, Truck, X, UserCheck, Zap, Loader2, FileDown, Image, MessageCircle, Check } from 'lucide-react';
 import './Invoices.css';
 
 function Invoices() {
@@ -25,6 +25,7 @@ function Invoices() {
   // Estado de descarga de facturas
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingPng, setDownloadingPng] = useState(false);
+  const [copiedWhatsapp, setCopiedWhatsapp] = useState(false);
 
   const handleDownloadPdf = async (facturaId) => {
     setDownloadingPdf(true);
@@ -45,6 +46,74 @@ function Invoices() {
       showNotification(`Error al generar PNG: ${err.message}`, 'error');
     } finally {
       setDownloadingPng(false);
+    }
+  };
+
+  const handleSendWhatsApp = async (factura) => {
+    try {
+      // El texto se genera dinámicamente con los datos de la factura, ítems agrupados y empresa
+      const formattedText = formatInvoiceWhatsAppText(
+        factura,
+        groupedSelectedItems,
+        config?.company_info
+      );
+
+      // Copiar al portapapeles siempre
+      let copiedOk = false;
+      if (navigator?.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(formattedText);
+          copiedOk = true;
+        } catch (err) {
+          console.warn('Error al copiar con navigator.clipboard:', err);
+        }
+      }
+
+      if (!copiedOk) {
+        try {
+          const textArea = document.createElement("textarea");
+          textArea.value = formattedText;
+          textArea.style.position = "fixed";
+          textArea.style.left = "-999999px";
+          textArea.style.top = "-999999px";
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          copiedOk = true;
+        } catch (e) {
+          console.warn('Fallback clipboard copy failed:', e);
+        }
+      }
+
+      setCopiedWhatsapp(true);
+      setTimeout(() => setCopiedWhatsapp(false), 2500);
+
+      // Detección de dispositivo móvil
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
+      if (isMobile) {
+        // En móvil: abrir WhatsApp directamente con el texto prellenado
+        const rawPhone = factura.cliente_telefono || factura.cliente?.telefono || '';
+        const cleanPhone = (rawPhone || '').replace(/\D/g, '');
+
+        let waUrl = '';
+        if (cleanPhone.length >= 7) {
+          waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(formattedText)}`;
+        } else {
+          waUrl = `https://wa.me/?text=${encodeURIComponent(formattedText)}`;
+        }
+
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+        showNotification('Factura copiada al portapapeles y abriendo WhatsApp...', 'success');
+      } else {
+        // En PC / Escritorio / Web: solo copiar al portapapeles
+        showNotification('¡Texto de la factura copiado al portapapeles listo para pegar!', 'success');
+      }
+    } catch (err) {
+      showNotification(`Error al formatear factura para WhatsApp: ${err.message}`, 'error');
     }
   };
 
@@ -89,7 +158,16 @@ function Invoices() {
       parsedIds = factura.items_id;
     }
     const invoiceItems = (items || []).filter(it => parsedIds.includes(it.id) || parsedIds.includes(String(it.id)));
-    return { ...factura, items: invoiceItems };
+    const matchedClient = (clientes || []).find(c => String(c.id) === String(factura.cliente_id)) || (typeof factura.cliente === 'object' ? factura.cliente : null);
+
+    return {
+      ...factura,
+      cliente_nombre: factura.cliente_nombre || matchedClient?.nombre || '',
+      cliente_apellido: factura.cliente_apellido || matchedClient?.apellido || '',
+      cliente_telefono: factura.cliente_telefono || matchedClient?.telefono || '',
+      cliente_domicilio: factura.cliente_domicilio || matchedClient?.domicilio || '',
+      items: invoiceItems
+    };
   };
 
   const fullSelectedFactura = getFullFactura(selectedFactura);
@@ -871,6 +949,19 @@ function Invoices() {
                   {downloadingPng
                     ? <><Loader2 size={14} className="spin-icon" /> Generando...</>
                     : <><Image size={14} /> PNG</>}
+                </button>
+
+                <button
+                  id={`btn-share-whatsapp-${fullSelectedFactura.id}`}
+                  className={`btn-download-invoice btn-download-whatsapp ${copiedWhatsapp ? 'is-copied' : ''}`}
+                  onClick={() => handleSendWhatsApp(fullSelectedFactura)}
+                  title="Copiar o enviar factura en formato de texto para WhatsApp"
+                >
+                  {copiedWhatsapp ? (
+                    <><Check size={14} /> ¡Copiado!</>
+                  ) : (
+                    <><MessageCircle size={14} /> WhatsApp</>
+                  )}
                 </button>
               </div>
               <button className="btn-icon" onClick={() => setSelectedFactura(null)}><X size={20} /></button>

@@ -506,6 +506,18 @@
   background: linear-gradient(135deg, #2c3e90 0%, #4e6ef2 100%);
   color: #ffffff;
 }
+
+.btn-download-whatsapp {
+  background: linear-gradient(135deg, #128c7e 0%, #25d366 100%);
+  color: #ffffff;
+  transition: all var(--transition-fast);
+}
+
+.btn-download-whatsapp.is-copied {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  transform: scale(1.02);
+}
+
 .spin-icon {
   animation: spin 0.9s linear infinite;
 }
